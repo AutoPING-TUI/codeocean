@@ -3,7 +3,7 @@
 Adding a new programming language to Codeocean is done in three steps:
 1. Create a Docker image that contains the necessary tools to compile, run, etc.
 2. Create a Ruby file under lib/ that specifies the name of the testing framework, parses the output of the testing tools, and returns the number of tests, number of failed tests, and associated error messages. 
-3. Create a new execution environment for the programming language in Codeoceans GUI.
+3. Create a new execution environment for the programming language in Codeoceans graphical interface.
 
 ### 1. Create the Docker image
 The following Dockerfile is used as a starting point:
@@ -22,7 +22,7 @@ USER user
 Each execution environment must be derived from `openhpi/docker_exec_phusion`. This image is based on `phusion/baseimage:master`, a Docker-optimized version of Ubuntu that provides, among other things, the [install_clean](https://github.com/phusion/baseimage-docker#overview) command for installing Ubuntu packages.  
 At the end, the user needs to be switched so that he does not get elevated privileges in his container.
 
-Specify the run and test command to be used for the programming language. Note that the run and test command are not automatically imported into Codeocean when you add a new Execution Environment.
+Specify the run and test command to be used for the programming language. You can use the parameter `%{filename}` inside the command string. When a user clicks on *run* or *test* for a certain file in Codeoceans graphical interface, `%{filename}` will be replaced with the name of this file. Note that the run and test command are not automatically imported into Codeocean when you add a new Execution Environment.
 
 Add the installation routines and customizations needed for the programming language.
 
