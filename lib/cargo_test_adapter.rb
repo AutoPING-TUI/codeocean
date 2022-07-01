@@ -36,9 +36,9 @@ class CargoTestAdapter < TestingFrameworkAdapter
         parsed_json_objects.each { |obj|
             if obj["type"] == "suite"
                 if obj.has_key?("test_count")
-                    count = obj["test_count"]
+                    count += obj["test_count"]
                 elsif obj.has_key?("failed")
-                    failed = obj["failed"]
+                    failed += obj["failed"]
                 end
             end
             if obj["type"] == "test" && obj["event"] == "failed"
