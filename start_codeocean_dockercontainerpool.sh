@@ -5,6 +5,7 @@ sessionname='codeocean-session'
 windowname='codeocean'
 tmux new-session -d -s $sessionname
 tmux new-window -n $windowname -t 0 -k 'cd /home/vagrant/dockercontainerpool && rails s -p 7100'
-tmux split-window -h -b -t $windowname 'cd /home/vagrant/codeocean && rails s -b 0.0.0.0 -p 7000'
+tmux split-window -h -b -t 0 'cd /home/vagrant/codeocean && rails s -b 0.0.0.0 -p 7000'
+tmux set-option -t 0 remain-on-exit on
 tmux attach -t $sessionname
 
