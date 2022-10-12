@@ -16,7 +16,7 @@ class ExecutionEnvironment < ApplicationRecord
   has_many :exercises
   belongs_to :file_type
   has_many :error_templates
-  belongs_to :testrun_execution_environment, optional: true, dependent: :destroy
+  has_many :testrun_execution_environments, dependent: :destroy
 
   scope :with_exercises, -> { where('id IN (SELECT execution_environment_id FROM exercises)') }
 
@@ -99,7 +99,7 @@ class ExecutionEnvironment < ApplicationRecord
     rescue Runner::Error => e
       # In case of an Runner::Error, we retry multiple times before giving up.
       # The time between each retry increases to allow the runner management to catch up.
-      if retries < 30 && !Rails.env.test?
+      if retries < 60 && !Rails.env.test?
         retries += 1
         sleep 1.second.to_i
         retry
