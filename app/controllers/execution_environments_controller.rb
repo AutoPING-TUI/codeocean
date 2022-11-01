@@ -2,9 +2,10 @@
 
 class ExecutionEnvironmentsController < ApplicationController
   include CommonBehavior
+  include FileConversion
 
   before_action :set_docker_images, only: %i[create edit new update]
-  before_action :set_execution_environment, only: MEMBER_ACTIONS + %i[execute_command shell statistics sync_to_runner_management]
+  before_action :set_execution_environment, only: MEMBER_ACTIONS + %i[execute_command shell list_files statistics sync_to_runner_management]
   before_action :set_testing_framework_adapters, only: %i[create edit new update]
 
   def authorize!
@@ -12,26 +13,40 @@ class ExecutionEnvironmentsController < ApplicationController
   end
   private :authorize!
 
-  def create
-    @execution_environment = ExecutionEnvironment.new(execution_environment_params)
+  def index
+    @execution_environments = ExecutionEnvironment.all.includes(:user).order(:name).paginate(page: params[:page], per_page: per_page_param)
     authorize!
-    create_and_respond(object: @execution_environment)
   end
 
-  def destroy
-    destroy_and_respond(object: @execution_environment)
+  def show
+    if @execution_environment.testing_framework?
+      @testing_framework_adapter = TestingFrameworkAdapter.descendants.find {|klass| klass.name == @execution_environment.testing_framework }
+    end
   end
 
-  def edit
-    # Add the current execution_environment if not already present in the list
-    @docker_images |= [@execution_environment.docker_image]
+  def new
+    @execution_environment = ExecutionEnvironment.new
+    authorize!
   end
 
   def execute_command
     runner = Runner.for(current_user, @execution_environment)
-    sudo = ActiveModel::Type::Boolean.new.cast(params[:sudo])
-    output = runner.execute_command(params[:command], privileged_execution: sudo, raise_exception: false)
+    @privileged_execution = ActiveModel::Type::Boolean.new.cast(params[:sudo]) || @execution_environment.privileged_execution
+    output = runner.execute_command(params[:command], privileged_execution: @privileged_execution, raise_exception: false)
     render json: output.except(:messages)
+  end
+
+  def list_files
+    runner = Runner.for(current_user, @execution_environment)
+    @privileged_execution = ActiveModel::Type::Boolean.new.cast(params[:sudo]) || @execution_environment.privileged_execution
+    begin
+      files = runner.retrieve_files(path: params[:path], recursive: false, privileged_execution: @privileged_execution)
+      downloadable_files, additional_directories = convert_files_json_to_files files
+      js_tree = FileTree.new(downloadable_files, additional_directories, force_closed: true).to_js_tree
+      render json: js_tree[:core][:data]
+    rescue Runner::Error::WorkspaceError
+      render json: []
+    end
   end
 
   def working_time_query
@@ -122,21 +137,22 @@ class ExecutionEnvironmentsController < ApplicationController
   end
   private :execution_environment_params
 
-  def index
-    @execution_environments = ExecutionEnvironment.all.includes(:user).order(:name).paginate(page: params[:page], per_page: per_page_param)
-    authorize!
+  def edit
+    # Add the current execution_environment if not already present in the list
+    @docker_images |= [@execution_environment.docker_image]
   end
 
-  def new
-    @execution_environment = ExecutionEnvironment.new
+  def create
+    @execution_environment = ExecutionEnvironment.new(execution_environment_params)
     authorize!
+    create_and_respond(object: @execution_environment)
   end
 
   def set_docker_images
     @docker_images ||= ExecutionEnvironment.pluck(:docker_image)
     @docker_images += Runner.strategy_class.available_images
   rescue Runner::Error => e
-    flash[:warning] = html_escape e.message
+    flash.now[:warning] = html_escape e.message
   ensure
     @docker_images = @docker_images.sort.uniq
   end
@@ -158,14 +174,12 @@ class ExecutionEnvironmentsController < ApplicationController
 
   def shell; end
 
-  def show
-    if @execution_environment.testing_framework?
-      @testing_framework_adapter = TestingFrameworkAdapter.descendants.find {|klass| klass.name == @execution_environment.testing_framework }
-    end
-  end
-
   def update
     update_and_respond(object: @execution_environment, params: execution_environment_params)
+  end
+
+  def destroy
+    destroy_and_respond(object: @execution_environment)
   end
 
   def sync_to_runner_management
@@ -225,4 +239,14 @@ class ExecutionEnvironmentsController < ApplicationController
       redirect_to ExecutionEnvironment, alert: t('execution_environments.index.synchronize_all.failure')
     end
   end
+
+  def augment_files_for_download(files)
+    files.map do |file|
+      # Downloadable files get an indicator whether we performed a privileged execution.
+      # The download path is added dynamically in the frontend.
+      file.privileged_execution = @privileged_execution
+      file
+    end
+  end
+  private :augment_files_for_download
 end

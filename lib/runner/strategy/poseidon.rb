@@ -111,7 +111,15 @@ class Runner::Strategy::Poseidon < Runner::Strategy
     url = "#{runner_url}/files"
     Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Sending files to #{url}" }
 
-    copy = files.map do |file|
+    # First create all the directories to apply the sticky bit for additional protection
+    # See https://github.com/openHPI/poseidon/pull/240
+    copy = files.uniq(&:path).filter_map do |file|
+      next if file.path.blank?
+
+      {path: "#{file.path}/"}
+    end
+
+    copy += files.map do |file|
       {
         path: file.filepath,
         content: Base64.strict_encode64(file.read || ''),
@@ -130,6 +138,64 @@ class Runner::Strategy::Poseidon < Runner::Strategy
     raise Runner::Error::FaradayError.new("Request to Poseidon failed: #{e.inspect}")
   ensure
     Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Finished copying files" }
+  end
+
+  def retrieve_files(path: './', recursive: true, privileged_execution: false)
+    url = "#{runner_url}/files"
+    params = {
+      path: path,
+      recursive: recursive,
+      privilegedExecution: privileged_execution || @execution_environment.privileged_execution,
+    }
+    Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Retrieving files at #{runner_url} with #{params}" }
+    response = self.class.http_connection.get url, params
+    case response.status
+      when 200
+        JSON.parse(response.body)
+      when 424
+        raise Runner::Error::WorkspaceError.new("The path #{path} is not available or could not be read.")
+      else
+        self.class.handle_error response
+    end
+  rescue Faraday::Error => e
+    raise Runner::Error::FaradayError.new("Request to Poseidon failed: #{e.inspect}")
+  ensure
+    Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Finished listing files" }
+  end
+
+  def download_file(file, privileged_execution: false, &block)
+    url = "#{runner_url}/files/raw"
+    params = {
+      path: file,
+      privilegedExecution: privileged_execution || @execution_environment.privileged_execution,
+    }
+    Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Download file #{params} from #{runner_url}" }
+    response = self.class.new_http_connection.get url, params do |request|
+      content_length = nil
+      content_type = nil
+      next if block.blank?
+
+      request.options.on_data = proc do |chunk, _overall_received_bytes, env|
+        next unless env.success?
+
+        content_length ||= env.response_headers['Content-Length'].presence&.to_i
+        content_type ||= env.response_headers['Content-Type'].presence || 'application/octet-stream'
+        yield chunk, content_length, content_type
+      end
+      request.options
+    end
+    case response.status
+      when 200
+        response.body
+      when 424
+        raise Runner::Error::WorkspaceError.new("The file #{file} is not available or could not be read.")
+      else
+        self.class.handle_error response
+    end
+  rescue Faraday::Error => e
+    raise Runner::Error::FaradayError.new("Request to Poseidon failed: #{e.inspect}")
+  ensure
+    Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Finished downloading file" }
   end
 
   def attach_to_execution(command, event_loop, starting_time, privileged_execution: false)
@@ -229,6 +295,12 @@ class Runner::Strategy::Poseidon < Runner::Strategy
   def self.http_connection
     @http_connection ||= Faraday.new(ssl: {ca_file: config[:ca_file]}, headers: headers) do |faraday|
       faraday.adapter :net_http_persistent
+    end
+  end
+
+  def self.new_http_connection
+    Faraday.new(ssl: {ca_file: config[:ca_file]}, headers: headers) do |faraday|
+      faraday.adapter :net_http
     end
   end
 

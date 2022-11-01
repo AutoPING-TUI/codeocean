@@ -60,7 +60,7 @@ describe FileTree do
         let(:file) { build(:file, file_type: build(:dot_svg)) }
 
         it 'is a text file icon' do
-          expect(file_icon).to include('fa-file-text')
+          expect(file_icon).to include('fa-file-lines')
           expect(file_icon).to include('fa-regular')
         end
       end
@@ -161,7 +161,7 @@ describe FileTree do
     end
 
     context 'with leaf nodes' do
-      let(:node) { root.add(Tree::TreeNode.new('')) }
+      let(:node) { root.add(Tree::TreeNode.new('', CodeOcean::File.new)) }
 
       it 'is a file icon' do
         expect(file_tree).to receive(:file_icon)
@@ -180,8 +180,8 @@ describe FileTree do
     end
   end
 
-  describe '#to_js_tree' do
-    let(:js_tree) { file_tree.to_js_tree }
+  describe '#to_js_tree_in_json' do
+    let(:js_tree) { file_tree.to_js_tree_in_json }
 
     it 'returns a String' do
       expect(js_tree).to be_a(String)
@@ -196,7 +196,7 @@ describe FileTree do
     context 'with files' do
       let(:files) { build_list(:file, 10, context: nil, path: 'foo/bar/baz') }
       let(:file_tree) { described_class.new(files) }
-      let(:js_tree) { file_tree.to_js_tree }
+      let(:js_tree) { file_tree.to_js_tree_in_json }
 
       it 'produces the required JSON format with a file' do
         # We ignore the root node and only use the children here

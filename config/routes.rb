@@ -66,6 +66,8 @@ Rails.application.routes.draw do
     member do
       get :shell
       post 'shell', as: :execute_command, action: :execute_command
+      get :list_files, as: :list_files_in
+      get 'download/:filename', as: :download_file_from, constraints: {filename: FILENAME_REGEXP}, action: :download_arbitrary_file, controller: 'live_streams'
       get :statistics
       post :sync_to_runner_management
     end
@@ -73,7 +75,7 @@ Rails.application.routes.draw do
     post :sync_all_to_runner_management, on: :collection
   end
 
-  post '/import_exercise' => 'exercises#import_exercise'
+  post '/import_task' => 'exercises#import_task'
   post '/import_uuid_check' => 'exercises#import_uuid_check'
 
   resources :exercises do
@@ -153,6 +155,7 @@ Rails.application.routes.draw do
     member do
       get 'download', as: :download, action: :download
       get 'download/:filename', as: :download_file, constraints: {filename: FILENAME_REGEXP}, action: :download_file
+      get 'download_stream/:filename', as: :download_stream_file, constraints: {filename: FILENAME_REGEXP}, action: :download_submission_file, controller: 'live_streams'
       get 'render/:filename', as: :render, constraints: {filename: FILENAME_REGEXP}, action: :render_file
       get 'run/:filename', as: :run, constraints: {filename: FILENAME_REGEXP}, action: :run
       get :score

@@ -326,6 +326,14 @@ de:
     shell:
       command: Befehl
       headline: Shell
+      file_tree:
+        reload: Aktualisieren
+        reload_tooltip: Aktualisieren Sie die Liste der verfügbaren Dateien im Runners. Diese Aktion wird einige Sekunden in Anspruch nehmen.
+        list_now: Jetzt laden.
+        headline: Dateisystem
+        empty: Das Dateisystem wurde bisher noch nicht aufgelistet.
+        root_notice: Dateien werden standardmäßig mit einem nicht-priviligerten Nutzer abgerufen. Um Dateien als "root" abzurufen, müssen Sie den "sudo" Schalter neben der Befehlszeile aktivieren und anschließend das Dateisystem vor dem Herunterladen einer Datei aktualisieren.
+        permission_denied: Der Zugriff auf die angeforderte Datei wurde verweigert. Bitte überprüfen Sie, dass die Datei existiert, der aktuelle Benutzer Leseberechtigungen besitzt und versuchen Sie ggf. die Datei mit "root"-Rechten anzufordern. Dazu müssen Sie den "sudo"-Schalter neben der Befehlszeile aktivieren und anschließend das Dateisystem vor dem Herunterladen einer Datei aktualisieren.
     statistics:
       exercise: Übung
       users: Anzahl (externer) Nutzer
@@ -385,6 +393,9 @@ de:
         disclaimer: Bei Fragen zu Deadlines wenden Sie sich bitte an das Teaching Team. Die hier angezeigte Abgabefrist dient nur zur Information und Angaben auf der jeweiligen Kursseite in der E-Learning-Plattform sollen immer Vorrang haben.
     editor_file_tree:
       file_root: Dateien
+    download_file_tree:
+      file_root: Erstellte Dateien
+      gone: Die angeforderte Datei konnte nicht abgerufen werden. Erstellte Dateien werden nur kurzzeitig vorgehalten und dann gelöscht. Bitte führen Sie den Code erneut aus und versuchen Sie dann wieder den Download der Datei.
     import_codeharbor:
       import_errors:
         invalid: Fehlerhafte Aufgabe
@@ -402,9 +413,9 @@ de:
         close: Schließen
         abort: Abbrechen
       check:
-        no_exercise: Auf CodeHarbor wurde keine entsprechende Aufgabe gefunden. Mit dem Export der Aufgabe wird eine neue auf CodeHarbor angelegt, die mit dieser verbunden ist. Anschließend können Veränderungen an der Aufgabe von beiden Systemen aus jeweils in das andere Übertragen werden.
-        exercise_found: Auf CodeHarbor wurde eine entsprechende Aufgabe gefunden. Mit dem Export der Aufgabe werden alle Veränderungen, die auf Codeocean vorgenommen wurden, exportiert und die Aufgabe auf CodeHarbor überschrieben.
-        exercise_found_no_right: Auf CodeHarbor wurde eine entsprechende Aufgabe gefunden, Sie haben aber keine Rechte sie zu bearbeiten. Bitte wenden Sie sich an einen Admin, wenn Sie denken, dass Sie die Rechte dazu besitzen sollten.
+        no_task: Auf CodeHarbor wurde keine entsprechende Aufgabe gefunden. Mit dem Export der Aufgabe wird eine neue auf CodeHarbor angelegt, die mit dieser verbunden ist. Anschließend können Veränderungen an der Aufgabe von beiden Systemen aus jeweils in das andere Übertragen werden.
+        task_found: Auf CodeHarbor wurde eine entsprechende Aufgabe gefunden. Mit dem Export der Aufgabe werden alle Veränderungen, die auf CodeOcean vorgenommen wurden, exportiert und die Aufgabe auf CodeHarbor überschrieben.
+        task_found_no_right: Auf CodeHarbor wurde eine entsprechende Aufgabe gefunden, Sie haben aber keine Rechte sie zu bearbeiten. Bitte wenden Sie sich an einen Admin, wenn Sie denken, dass Sie die Rechte dazu besitzen sollten.
     file_form:
       hints:
         feedback_message: Diese Nachricht wird als Hinweis zu fehlschlagenden Tests angezeigt.

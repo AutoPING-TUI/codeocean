@@ -11,15 +11,8 @@ class SessionsController < ApplicationController
   skip_after_action :verify_authorized
   skip_before_action :verify_authenticity_token, only: :create_through_lti
 
-  def create
-    if login(params[:email], params[:password], params[:remember_me])
-      # We set the user's default study group to the "internal" group (no external id) for the given consumer.
-      session[:study_group_id] = current_user.study_groups.find_by(external_id: nil)&.id
-      redirect_back_or_to(:root, notice: t('.success'))
-    else
-      flash.now[:danger] = t('.failure')
-      render(:new)
-    end
+  def new
+    redirect_to(:root, alert: t('shared.already_signed_in')) if current_user
   end
 
   def create_through_lti
@@ -34,13 +27,15 @@ class SessionsController < ApplicationController
     end
   end
 
-  def destroy
-    if current_user&.external_user?
-      clear_lti_session_data
+  def create
+    if login(params[:email], params[:password], params[:remember_me])
+      # We set the user's default study group to the "internal" group (no external id) for the given consumer.
+      session[:study_group_id] = current_user.study_groups.find_by(external_id: nil)&.id
+      redirect_back_or_to(:root, notice: t('.success'))
     else
-      logout
+      flash.now[:danger] = t('.failure')
+      render(:new)
     end
-    redirect_to(:root, notice: t('.success'))
   end
 
   def destroy_through_lti
@@ -52,7 +47,18 @@ class SessionsController < ApplicationController
     clear_lti_session_data(@submission.exercise_id, @submission.user_id)
   end
 
-  def new
-    redirect_to(:root, alert: t('shared.already_signed_in')) if current_user
+  def destroy
+    if current_user&.external_user?
+      clear_lti_session_data
+
+      # In case we have another session as an internal user, we set the study group for this one
+      internal_user = find_or_login_current_user
+      if internal_user.present?
+        session[:study_group_id] = internal_user.study_groups.find_by(external_id: nil)&.id
+      end
+    else
+      logout
+    end
+    redirect_to(:root, notice: t('.success'))
   end
 end

@@ -29,7 +29,7 @@ gem 'net-smtp', require: false
 gem 'nokogiri'
 gem 'pagedown-bootstrap-rails'
 gem 'pg'
-gem 'proforma', github: 'openHPI/proforma', branch: 'v0.5.2'
+gem 'proforma', github: 'openHPI/proforma', tag: 'v0.7.1'
 gem 'prometheus_exporter'
 gem 'pry-byebug'
 gem 'puma'
@@ -82,7 +82,7 @@ end
 group :test do
   gem 'autotest' # required by autotest-rails
   gem 'autotest-rails'
-  gem 'capybara'
+  gem 'capybara', github: 'teamcapybara/capybara', branch: 'master' # Required with Puma 6, remove with 3.37.2+. See https://github.com/teamcapybara/capybara/tags
   gem 'database_cleaner'
   gem 'headless'
   gem 'nyan-cat-formatter'
