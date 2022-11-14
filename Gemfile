@@ -43,7 +43,7 @@ gem 'rest-client'
 gem 'rubytree'
 gem 'rubyzip'
 gem 'sass-rails'
-gem 'shakapacker', '6.5.2'
+gem 'shakapacker', '6.5.4'
 gem 'slim-rails'
 gem 'sorcery' # Causes a deprecation warning in Rails 6.0+, see: https://github.com/Sorcery/sorcery/pull/255
 gem 'telegraf'
@@ -82,7 +82,7 @@ end
 group :test do
   gem 'autotest' # required by autotest-rails
   gem 'autotest-rails'
-  gem 'capybara', github: 'teamcapybara/capybara', branch: 'master' # Required with Puma 6, remove with 3.37.2+. See https://github.com/teamcapybara/capybara/tags
+  gem 'capybara'
   gem 'database_cleaner'
   gem 'headless'
   gem 'nyan-cat-formatter'
