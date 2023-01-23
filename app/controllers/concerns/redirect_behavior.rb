@@ -90,7 +90,7 @@ module RedirectBehavior
 
     # Acquire lock here! This is expensive but required for synchronization
     @community_solution_lock = ActiveRecord::Base.transaction do
-      ActiveRecord::Base.connection.execute("LOCK #{CommunitySolutionLock.table_name} IN ACCESS EXCLUSIVE MODE")
+      ApplicationRecord.connection.exec_query("LOCK #{CommunitySolutionLock.table_name} IN ACCESS EXCLUSIVE MODE")
 
       # This is returned
       CommunitySolutionLock.find_or_create_by(community_solution: @community_solution, locked_until: Time.zone.now...) do |lock|
@@ -124,7 +124,7 @@ module RedirectBehavior
       session: session.to_hash,
       submission: @submission.inspect,
       params: params.as_json,
-      current_user: current_user,
+      current_user:,
       lti_exercise_id: session[:lti_exercise_id],
       lti_parameters_id: session[:lti_parameters_id]
     )

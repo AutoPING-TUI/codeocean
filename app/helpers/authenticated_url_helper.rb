@@ -11,7 +11,7 @@ module AuthenticatedUrlHelper
     COOKIE_EXPIRATION = 30.seconds
 
     def sign(url, object)
-      payload = {object_id: object.id, object_type: object.class.name, url: url, exp: TOKEN_EXPIRATION.from_now.to_i}
+      payload = {object_id: object.id, object_type: object.class.name, url:, exp: TOKEN_EXPIRATION.from_now.to_i}
       token = JWT.encode payload, TOKEN_SECRET, TOKEN_ALGORITHM
 
       add_query_parameters(url, {TOKEN_PARAM => token})
@@ -29,7 +29,11 @@ module AuthenticatedUrlHelper
       end
 
       cookie_name = AuthenticatedUrlHelper.cookie_name_for(:render_file_token)
-      object = klass.find(request.parameters[:id])
+      begin
+        object = klass.find(request.parameters[:id])
+      rescue ActiveRecord::RecordNotFound
+        raise Pundit::NotAuthorizedError
+      end
 
       signed_url = request.parameters[TOKEN_PARAM].present? ? request.url : cookies[cookie_name]
       # Throws an exception if the token is not matching the object or has expired
@@ -54,7 +58,7 @@ module AuthenticatedUrlHelper
 
     def prepare_short_living_cookie(value)
       {
-        value: value,
+        value:,
         expires: COOKIE_EXPIRATION.from_now,
         httponly: true,
         same_site: :strict,

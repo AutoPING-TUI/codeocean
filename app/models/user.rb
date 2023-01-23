@@ -33,7 +33,7 @@ class User < ApplicationRecord
                               end
                             }
 
-  validates :platform_admin, boolean_presence: true
+  validates :platform_admin, inclusion: [true, false]
 
   def internal_user?
     is_a?(InternalUser)
@@ -69,6 +69,15 @@ class User < ApplicationRecord
 
   def to_s
     displayname
+  end
+
+  def to_sentry_context
+    {
+      id:,
+      type: self.class.name,
+      username: displayname,
+      consumer: consumer.name,
+    }
   end
 
   def self.ransackable_attributes(auth_object)

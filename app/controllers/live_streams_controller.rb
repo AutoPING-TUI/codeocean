@@ -6,15 +6,14 @@ class LiveStreamsController < ApplicationController
   include ActionController::Live
 
   def download_submission_file
-    begin
-      @submission = authorize AuthenticatedUrlHelper.retrieve!(Submission, request, force_render_host: false)
-    rescue Pundit::NotAuthorizedError
-      # TODO: Option to disable?
-      # Using the submission ID parameter would allow looking up the corresponding exercise ID
-      # Therefore, we just redirect to the root_path, but actually expect to redirect back (that should work!)
-      redirect_back(fallback_location: root_path, alert: t('exercises.download_file_tree.gone'))
-    end
-
+    @submission = authorize AuthenticatedUrlHelper.retrieve!(Submission, request, force_render_host: false)
+  rescue Pundit::NotAuthorizedError
+    # TODO: Option to disable?
+    # Using the submission ID parameter would allow looking up the corresponding exercise ID
+    # Therefore, we just redirect to the root_path, but actually expect to redirect back (that should work!)
+    skip_authorization
+    redirect_back(fallback_location: root_path, allow_other_host: true, alert: t('exercises.download_file_tree.gone'))
+  else
     desired_file = params[:filename].to_s
     runner = Runner.for(current_user, @submission.exercise.execution_environment)
     fallback_location = implement_exercise_path(@submission.exercise)
@@ -27,14 +26,14 @@ class LiveStreamsController < ApplicationController
     runner = Runner.for(current_user, @execution_environment)
     fallback_location = shell_execution_environment_path(@execution_environment)
     privileged = params[:sudo] || @execution_environment.privileged_execution?
-    send_runner_file(runner, desired_file, fallback_location, privileged: privileged)
+    send_runner_file(runner, desired_file, fallback_location, privileged:)
   end
 
   private
 
   def send_runner_file(runner, desired_file, redirect_fallback = root_path, privileged: false)
     filename = File.basename(desired_file)
-    send_stream(filename: filename, type: 'application/octet-stream', disposition: 'attachment') do |stream|
+    send_stream(filename:, type: 'application/octet-stream', disposition: 'attachment') do |stream|
       runner.download_file desired_file, privileged_execution: privileged do |chunk, overall_size, _content_type|
         unless response.committed?
           # Disable Rack::ETag, which would otherwise cause the response to be cached
@@ -60,21 +59,4 @@ class LiveStreamsController < ApplicationController
       redirect_back(fallback_location: redirect_fallback, alert: t('exercises.download_file_tree.gone'))
     end
   end
-
-  # TODO: Taken from Rails 7, remove when upgrading
-  # rubocop:disable all
-  def send_stream(filename:, disposition: "attachment", type: nil)
-    response.headers["Content-Type"] =
-      (type.is_a?(Symbol) ? Mime[type].to_s : type) ||
-        Mime::Type.lookup_by_extension(File.extname(filename).downcase.delete(".")) ||
-        "application/octet-stream"
-
-    response.headers["Content-Disposition"] =
-      ActionDispatch::Http::ContentDisposition.format(disposition: disposition, filename: filename)
-
-    yield response.stream
-  ensure
-    response.stream.close
-  end
-  # rubocop:enable all
 end

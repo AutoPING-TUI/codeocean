@@ -14,8 +14,9 @@ gem 'faraday-net_http_persistent'
 gem 'faye-websocket'
 gem 'forgery'
 gem 'highline'
+gem 'http_accept_language'
 gem 'i18n-js'
-gem 'ims-lti', '< 2.0.0'
+gem 'ims-lti', '< 2.0.0' # Version 2 implements LTI 2.0, which is deprecated. Hence, we stay with version 1.
 gem 'jbuilder'
 gem 'json_schemer'
 gem 'js-routes'
@@ -34,8 +35,8 @@ gem 'prometheus_exporter'
 gem 'pry-byebug'
 gem 'puma'
 gem 'pundit'
-gem 'rails', '~> 6.1.7'
-gem 'rails_admin', '< 3.0.0' # Blocked by https://github.com/railsadminteam/rails_admin/issues/3490
+gem 'rails', '~> 7.0.4'
+gem 'rails_admin', '< 4.0.0'
 gem 'rails-i18n'
 gem 'rails-timeago'
 gem 'ransack'
@@ -43,10 +44,13 @@ gem 'rest-client'
 gem 'rubytree'
 gem 'rubyzip'
 gem 'sass-rails'
-gem 'shakapacker', '6.5.4'
+gem 'sd_notify' # Watchdog service monitoring for systemd, automatically used by Puma if this gem is installed
+gem 'shakapacker', '6.5.5'
 gem 'slim-rails'
 gem 'sorcery' # Causes a deprecation warning in Rails 6.0+, see: https://github.com/Sorcery/sorcery/pull/255
+gem 'sprockets-rails'
 gem 'telegraf'
+gem 'terser'
 gem 'tubesock'
 gem 'turbolinks'
 gem 'whenever', require: false
@@ -70,13 +74,10 @@ group :development, :staging do
   gem 'pry-rails'
   gem 'rack-mini-profiler'
   gem 'rubocop', require: false
+  gem 'rubocop-capybara'
   gem 'rubocop-performance'
   gem 'rubocop-rails', require: false
   gem 'rubocop-rspec'
-end
-
-group :development, :test, :staging do
-  gem 'spring'
 end
 
 group :test do

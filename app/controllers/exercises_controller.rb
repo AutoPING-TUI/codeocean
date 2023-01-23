@@ -128,15 +128,15 @@ class ExercisesController < ApplicationController
         status: 'success',
         message: t('exercises.export_codeharbor.successfully_exported', id: @exercise.id, title: @exercise.title),
         actions: render_to_string(partial: 'export_actions',
-          locals: {exercise: @exercise, exported: true, error: error}),
+          locals: {exercise: @exercise, exported: true, error:}),
       }
       @exercise.save
     else
       render json: {
         status: 'fail',
-        message: t('exercises.export_codeharbor.export_failed', id: @exercise.id, title: @exercise.title, error: error),
+        message: t('exercises.export_codeharbor.export_failed', id: @exercise.id, title: @exercise.title, error:),
         actions: render_to_string(partial: 'export_actions',
-          locals: {exercise: @exercise, exported: true, error: error}),
+          locals: {exercise: @exercise, exported: true, error:}),
       }
     end
   end
@@ -146,7 +146,7 @@ class ExercisesController < ApplicationController
     return render json: {}, status: :unauthorized if user.nil?
 
     uuid = params[:uuid]
-    exercise = Exercise.find_by(uuid: uuid)
+    exercise = Exercise.find_by(uuid:)
 
     return render json: {uuid_found: false} if exercise.nil?
     return render json: {uuid_found: true, update_right: false} unless ExercisePolicy.new(user, exercise).update?
@@ -163,7 +163,7 @@ class ExercisesController < ApplicationController
     return render json: {}, status: :unauthorized if user.nil?
 
     ActiveRecord::Base.transaction do
-      exercise = ::ProformaService::Import.call(zip: tempfile, user: user)
+      exercise = ::ProformaService::Import.call(zip: tempfile, user:)
       exercise.save!
       render json: {}, status: :created
     end
@@ -185,7 +185,7 @@ class ExercisesController < ApplicationController
   private :user_from_api_key
 
   def user_by_codeharbor_token(api_key)
-    link = CodeharborLink.find_by(api_key: api_key)
+    link = CodeharborLink.find_by(api_key:)
     link&.user
   end
 
@@ -351,7 +351,7 @@ class ExercisesController < ApplicationController
       lti_json = lti_parameters.lti_parameters['launch_presentation_return_url']
 
       @course_token =
-        if lti_json.present? && (match = lti_json.match(%r{^.*courses/([a-z0-9\-]+)/sections}))
+        if lti_json.present? && (match = lti_json.match(%r{^.*courses/([a-z0-9-]+)/sections}))
           match.captures.first
         else
           ''
@@ -394,8 +394,8 @@ class ExercisesController < ApplicationController
   def working_times
     working_time_accumulated = @exercise.accumulated_working_time_for_only(current_user)
     working_time_75_percentile = @exercise.get_quantiles([0.75]).first
-    render(json: {working_time_75_percentile: working_time_75_percentile,
-                   working_time_accumulated: working_time_accumulated})
+    render(json: {working_time_75_percentile:,
+                   working_time_accumulated:})
   end
 
   def intervention
@@ -404,7 +404,7 @@ class ExercisesController < ApplicationController
       render(json: {success: 'false', error: "undefined intervention #{params[:intervention_type]}"})
     else
       uei = UserExerciseIntervention.new(
-        user: current_user, exercise: @exercise, intervention: intervention,
+        user: current_user, exercise: @exercise, intervention:,
         accumulated_worktime_s: @exercise.accumulated_working_time_for_only(current_user)
       )
       uei.save
@@ -443,6 +443,7 @@ class ExercisesController < ApplicationController
     if current_user.admin? || current_user.teacher?
       redirect_to(@exercise, alert: t('exercises.implement.unpublished')) if @exercise.unpublished?
       redirect_to(@exercise, alert: t('exercises.implement.no_files')) unless @exercise.files.visible.exists?
+      redirect_to(@exercise, alert: t('exercises.implement.no_execution_environment')) if @exercise.execution_environment.blank?
     else
       render_not_authorized
     end
@@ -483,7 +484,7 @@ class ExercisesController < ApplicationController
     checked_tags = checked_exercise_tags.collect(&:tag).to_set
     unchecked_tags = Tag.all.to_set.subtract checked_tags
     @exercise_tags = checked_exercise_tags + unchecked_tags.collect do |tag|
-      ExerciseTag.new(exercise: @exercise, tag: tag)
+      ExerciseTag.new(exercise: @exercise, tag:)
     end
   end
 
@@ -522,7 +523,7 @@ class ExercisesController < ApplicationController
     end
 
     render locals: {
-      user_statistics: user_statistics,
+      user_statistics:,
     }
   end
 

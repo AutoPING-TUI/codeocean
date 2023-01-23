@@ -110,21 +110,21 @@ class ApplicationController < ActionController::Base
           redirect_to :root, alert: message
         # Redirect to main domain if the request originated from our render_host
         elsif request.path == '/' && request.host == RENDER_HOST
-          redirect_to Rails.application.config.action_mailer.default_url_options
+          redirect_to Rails.application.config.action_mailer.default_url_options, allow_other_host: true
         else
           redirect_back fallback_location: :root, allow_other_host: false, alert: message
         end
       end
-      format.json { render json: {error: message}, status: status }
+      format.json { render json: {error: message}, status: }
     end
   end
   private :render_error
 
-  def switch_locale(&action)
+  def switch_locale(&)
     session[:locale] = sanitize_locale(params[:custom_locale] || params[:locale] || session[:locale])
-    locale = session[:locale] || I18n.default_locale
-    Sentry.set_extras(locale: locale)
-    I18n.with_locale(locale, &action)
+    locale = session[:locale] || http_accept_language.compatible_language_from(I18n.available_locales) || I18n.default_locale
+    Sentry.set_extras(locale:)
+    I18n.with_locale(locale, &)
   end
   private :switch_locale
 

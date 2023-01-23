@@ -54,6 +54,10 @@ de:
       proxy_exercise:
         title: Title
         files_count: Anzahl der Aufgaben
+        algorithm: Algorithmus
+        algorithm_type:
+          best_match: Beste Übereinstimmung
+          random: Zufällige Aufgabe
       external_user:
         consumer: Konsument
         email: E-Mail
@@ -447,6 +451,7 @@ de:
       not_graded: ohne Punkte
       hint: Hinweis
       no_files: Die Aufgabe umfasst noch keine sichtbaren Dateien.
+      no_execution_environment: Für die Aufgabe wurde noch keine Ausführungsumgebung gewählt.
       no_output: Die letzte Code-Ausführung terminierte am %{timestamp} ohne Ausgabe.
       no_output_exit_successful: Die letzte Code-Ausführung terminierte am %{timestamp} ohne Ausgabe and wurde erfolgreich beendet (Statuscode %{exit_code}).
       no_output_exit_failure: Die letzte Code-Ausführung terminierte am %{timestamp} ohne Ausgabe und wurde mit einem Fehler beendet (Statuscode %{exit_code}).
@@ -801,8 +806,8 @@ de:
     send_thank_you_note: "Senden"
     cancel_thank_you_note: "Nichts senden"
     comment_edited: "bearbeitet"
-    modal_title: "Einen Kommentar in Zeile ${line} hinzufügen"
-    click_for_more_comments: "Klicken um ${numComments} weitere Kommentare zu sehen..."
+    modal_title: "Einen Kommentar in Zeile %{line} hinzufügen"
+    click_for_more_comments: "Klicken um %{numComments} weitere Kommentare zu sehen..."
     subscribe_to_author: "Bei neuen Kommentaren des Autors per E-Mail benachrichtigt werden"
     no_output: "Keine Ausgabe."
     runtime_output: "Programmausgabe"

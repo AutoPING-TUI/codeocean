@@ -3,6 +3,7 @@
 class ExecutionEnvironmentsController < ApplicationController
   include CommonBehavior
   include FileConversion
+  include TimeHelper
 
   before_action :set_docker_images, only: %i[create edit new update]
   before_action :set_execution_environment, only: MEMBER_ACTIONS + %i[execute_command shell list_files statistics sync_to_runner_management]
@@ -106,17 +107,21 @@ class ExecutionEnvironmentsController < ApplicationController
     working_time_statistics = {}
     user_statistics = {}
 
-    ApplicationRecord.connection.execute(working_time_query).each do |tuple|
+    ApplicationRecord.connection.exec_query(working_time_query).each do |tuple|
+      tuple = tuple.merge({
+        'average_time' => format_time_difference(tuple['average_time']),
+        'stddev_time' => format_time_difference(tuple['stddev_time']),
+      })
       working_time_statistics[tuple['exercise_id'].to_i] = tuple
     end
 
-    ApplicationRecord.connection.execute(user_query).each do |tuple|
+    ApplicationRecord.connection.exec_query(user_query).each do |tuple|
       user_statistics[tuple['exercise_id'].to_i] = tuple
     end
 
     render locals: {
-      working_time_statistics: working_time_statistics,
-      user_statistics: user_statistics,
+      working_time_statistics:,
+      user_statistics:,
     }
   end
 
@@ -132,7 +137,7 @@ class ExecutionEnvironmentsController < ApplicationController
       params[:execution_environment]
         .permit(:docker_image, :editor_mode, :file_extension, :file_type_id, :help, :indent_size, :memory_limit, :cpu_limit, :name,
           :network_enabled, :privileged_execution, :permitted_execution_time, :pool_size, :run_command, :test_command, :testing_framework)
-        .merge(user_id: current_user.id, user_type: current_user.class.name, exposed_ports: exposed_ports)
+        .merge(user_id: current_user.id, user_type: current_user.class.name, exposed_ports:)
     end
   end
   private :execution_environment_params
@@ -152,7 +157,7 @@ class ExecutionEnvironmentsController < ApplicationController
     @docker_images ||= ExecutionEnvironment.pluck(:docker_image)
     @docker_images += Runner.strategy_class.available_images
   rescue Runner::Error => e
-    flash.now[:warning] = html_escape e.message
+    flash.now[:warning] = ERB::Util.html_escape e.message
   ensure
     @docker_images = @docker_images.sort.uniq
   end
@@ -189,7 +194,7 @@ class ExecutionEnvironmentsController < ApplicationController
       Runner.strategy_class.sync_environment(@execution_environment)
     rescue Runner::Error => e
       Rails.logger.warn { "Runner error while synchronizing execution environment with id #{@execution_environment.id}: #{e.message}" }
-      redirect_to @execution_environment, alert: t('execution_environments.index.synchronize.failure', error: html_escape(e.message))
+      redirect_to @execution_environment, alert: t('execution_environments.index.synchronize.failure', error: ERB::Util.html_escape(e.message))
     else
       redirect_to @execution_environment, notice: t('execution_environments.index.synchronize.success')
     end

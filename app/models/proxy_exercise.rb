@@ -4,6 +4,11 @@ class ProxyExercise < ApplicationRecord
   include Creation
   include DefaultValues
 
+  enum algorithm: {
+    best_match: 0,
+    random: 1,
+  }, _default: :write, _prefix: true
+
   after_initialize :generate_token
   after_initialize :set_reason
   after_initialize :set_default_values
@@ -11,7 +16,7 @@ class ProxyExercise < ApplicationRecord
   has_and_belongs_to_many :exercises
   has_many :user_proxy_exercise_exercises
 
-  validates :public, boolean_presence: true
+  validates :public, inclusion: [true, false]
 
   def count_files
     exercises.count
@@ -42,22 +47,31 @@ class ProxyExercise < ApplicationRecord
   end
 
   def get_matching_exercise(user)
-    assigned_user_proxy_exercise = user_proxy_exercise_exercises.find_by(user: user)
+    assigned_user_proxy_exercise = user_proxy_exercise_exercises.find_by(user:)
     if assigned_user_proxy_exercise
       Rails.logger.debug { "retrieved assigned exercise for user #{user.id}: Exercise #{assigned_user_proxy_exercise.exercise}" }
       assigned_user_proxy_exercise.exercise
     else
-      Rails.logger.debug { "find new matching exercise for user #{user.id}" }
       matching_exercise =
-        begin
-          find_matching_exercise(user)
-        rescue StandardError => e # fallback
-          Rails.logger.error("finding matching exercise failed. Fall back to random exercise! Error: #{$ERROR_INFO}")
-          @reason[:reason] = 'fallback because of error'
-          @reason[:error] = "#{$ERROR_INFO}:\n\t#{e.backtrace.join("\n\t")}"
-          exercises.where('expected_difficulty > 1').sample # difficulty should be > 1 to prevent dummy exercise from being chosen.
+        case algorithm
+          when 'best_match'
+            Rails.logger.debug { "find new matching exercise for user #{user.id}" }
+            begin
+              find_matching_exercise(user)
+            rescue StandardError => e # fallback
+              Rails.logger.error("finding matching exercise failed. Fall back to random exercise! Error: #{$ERROR_INFO}")
+              @reason[:reason] = 'fallback because of error'
+              @reason[:error] = "#{$ERROR_INFO}:\n\t#{e.backtrace.join("\n\t")}"
+              exercises.where('expected_difficulty > 1').sample # difficulty should be > 1 to prevent dummy exercise from being chosen.
+            end
+          when 'random'
+            @reason[:reason] = 'random exercise requested'
+            exercises.sample
+          else
+            raise "Unknown algorithm #{algorithm}"
         end
-      user.user_proxy_exercise_exercises << UserProxyExerciseExercise.create(user: user,
+
+      user.user_proxy_exercise_exercises << UserProxyExerciseExercise.create(user:,
         exercise: matching_exercise, proxy_exercise: self, reason: @reason.to_json)
       matching_exercise
     end
@@ -105,9 +119,9 @@ class ProxyExercise < ApplicationRecord
       relative_knowledge_improvement[potex] = 0.0
       Rails.logger.debug { "review potential exercise #{potex.id}" }
       tags.each do |tag|
-        tag_ratio = potex.exercise_tags.find_by(tag: tag).factor.to_f / potex.exercise_tags.inject(0) do |sum, et|
-                                                                          sum + et.factor
-                                                                        end
+        tag_ratio = potex.exercise_tags.find_by(tag:).factor.to_f / potex.exercise_tags.inject(0) do |sum, et|
+                                                                      sum + et.factor
+                                                                    end
         max_topic_knowledge_ratio = potex.expected_difficulty * tag_ratio
         old_relative_loss_tag = topic_knowledge_user[tag] / topic_knowledge_max[tag]
         new_relative_loss_tag = topic_knowledge_user[tag] / (topic_knowledge_max[tag] + max_topic_knowledge_ratio)
@@ -240,7 +254,7 @@ class ProxyExercise < ApplicationRecord
 
   def tag_diminishing_return_function(count_tag, total_count_tag)
     total_count_tag += 1 # bonus exercise comes on top
-    1 / (1 + (Math::E**(-3 / (0.5 * total_count_tag) * (count_tag - (0.5 * total_count_tag)))))
+    1 / ((Math::E**(-3 / (total_count_tag * 0.5) * (count_tag - (total_count_tag * 0.5)))) + 1)
   end
 
   def select_easiest_exercise(exercises)

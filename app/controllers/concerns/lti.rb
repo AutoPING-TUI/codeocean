@@ -124,10 +124,10 @@ module Lti
   private :require_valid_oauth_signature
 
   def return_to_consumer(options = {})
-    consumer_return_url = @provider.try(:launch_presentation_return_url) || params[:launch_presentation_return_url]
+    consumer_return_url = @provider.try(:launch_presentation_return_url)
     if consumer_return_url
       consumer_return_url += "?#{options.to_query}" if options.present?
-      redirect_to(consumer_return_url)
+      redirect_to(consumer_return_url, allow_other_host: true)
     else
       flash[:danger] = options[:lti_errormsg]
       flash[:info] = options[:lti_msg]
@@ -170,8 +170,14 @@ module Lti
         # Reduce score by 100%
         normalized_lit_score *= 0.0
       end
-      response = provider.post_replace_result!(normalized_lit_score)
-      {code: response.response_code, message: response.post_response.body, status: response.code_major, score_sent: normalized_lit_score}
+
+      begin
+        response = provider.post_replace_result!(normalized_lit_score)
+        {code: response.response_code, message: response.post_response.body, status: response.code_major, score_sent: normalized_lit_score}
+      rescue IMS::LTI::XMLParseError
+        # A parsing error might happen if the LTI provider is down and doesn't return a valid XML response
+        {status: 'error'}
+      end
     else
       {status: 'unsupported'}
     end

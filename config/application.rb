@@ -13,7 +13,7 @@ require 'telegraf/rails'
 module CodeOcean
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
-    config.load_defaults 6.1
+    config.load_defaults 7.0
 
     # Configuration for the application, engines, and railties goes here.
     #
@@ -22,19 +22,19 @@ module CodeOcean
 
     # Set Time.zone default to the specified zone and make Active Record auto-convert to this zone.
     # Run "rake -D time" for a list of tasks for finding time zone names. Default is UTC.
-    config.time_zone = 'UTC'
+    config.time_zone = ENV.fetch('RAILS_TIME_ZONE', 'UTC')
 
     # The default locale is :en and all translations from config/locales/*.rb,yml are auto loaded.
     # config.i18n.load_path += Dir[Rails.root.join('my', 'locales', '*.{rb,yml}').to_s]
     # config.i18n.default_locale = :de
     config.i18n.available_locales = %i[de en]
 
-    extra_paths = %W[
-      #{config.root}/lib
+    extra_paths = [
+      Rails.root.join('lib'),
     ]
 
     # Add generators, they don't have a module structure that matches their directory structure.
-    extra_paths << "#{config.root}/lib/generators"
+    extra_paths << Rails.root.join('lib/generators')
 
     config.add_autoload_paths_to_load_path = false
     config.autoload_paths += extra_paths

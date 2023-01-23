@@ -26,9 +26,9 @@ module ProformaService
         allow_file_creation: string_to_bool(@task.meta_data[:CodeOcean]&.dig(:allow_file_creation)) || false,
         allow_auto_completion: string_to_bool(@task.meta_data[:CodeOcean]&.dig(:allow_auto_completion)) || false,
         expected_difficulty: @task.meta_data[:CodeOcean]&.dig(:expected_difficulty) || 1,
-        execution_environment_id: execution_environment_id,
+        execution_environment_id:,
 
-        files: files
+        files:
       )
     end
 
@@ -86,7 +86,7 @@ module ProformaService
       codeocean_file = CodeOcean::File.new(
         context: @exercise,
         file_type: file_type(extension),
-        hidden: file.visible == 'no',
+        hidden: file.visible != 'yes', # hides 'delayed' and 'no'
         name: File.basename(file.filename, '.*'),
         read_only: file.usage_by_lms != 'edit',
         role: @task.meta_data[:CodeOcean]&.dig(:files)&.dig("CO-#{file.id}".to_sym)&.dig(:role),

@@ -146,7 +146,7 @@ class SubmissionsController < ApplicationController
             end
           else
             Rails.logger.info("Unknown command from client: #{event[:cmd]}")
-            Sentry.set_extras(event: event)
+            Sentry.set_extras(event:)
             Sentry.capture_message("Unknown command from client: #{event[:cmd]}")
         end
       rescue JSON::ParserError => e
@@ -168,13 +168,13 @@ class SubmissionsController < ApplicationController
 
       runner_socket.on :stdout do |data|
         message = retrieve_message_from_output data, :stdout
-        @testrun[:output] << message[:data][0, max_output_buffer_size - @testrun[:output].size] if message[:data]
+        @testrun[:output] << message[:data].to_s[0, max_output_buffer_size - @testrun[:output].size] if message[:data]
         send_and_store client_socket, message
       end
 
       runner_socket.on :stderr do |data|
         message = retrieve_message_from_output data, :stderr
-        @testrun[:output] << message[:data][0, max_output_buffer_size - @testrun[:output].size] if message[:data]
+        @testrun[:output] << message[:data].to_s[0, max_output_buffer_size - @testrun[:output].size] if message[:data]
         send_and_store client_socket, message
       end
 
@@ -183,19 +183,19 @@ class SubmissionsController < ApplicationController
         exit_statement =
           if @testrun[:output].empty? && exit_code.zero?
             @testrun[:status] = :ok
-            t('exercises.implement.no_output_exit_successful', timestamp: l(Time.zone.now, format: :short), exit_code: exit_code)
+            t('exercises.implement.no_output_exit_successful', timestamp: l(Time.zone.now, format: :short), exit_code:)
           elsif @testrun[:output].empty?
             @testrun[:status] = :failed
-            t('exercises.implement.no_output_exit_failure', timestamp: l(Time.zone.now, format: :short), exit_code: exit_code)
+            t('exercises.implement.no_output_exit_failure', timestamp: l(Time.zone.now, format: :short), exit_code:)
           elsif exit_code.zero?
             @testrun[:status] = :ok
-            "\n#{t('exercises.implement.exit_successful', timestamp: l(Time.zone.now, format: :short), exit_code: exit_code)}"
+            "\n#{t('exercises.implement.exit_successful', timestamp: l(Time.zone.now, format: :short), exit_code:)}"
           else
             @testrun[:status] = :failed
-            "\n#{t('exercises.implement.exit_failure', timestamp: l(Time.zone.now, format: :short), exit_code: exit_code)}"
+            "\n#{t('exercises.implement.exit_failure', timestamp: l(Time.zone.now, format: :short), exit_code:)}"
           end
         stream = @testrun[:status] == :ok ? :stdout : :stderr
-        send_and_store client_socket, {cmd: :write, stream: stream, data: "#{exit_statement}\n"}
+        send_and_store client_socket, {cmd: :write, stream:, data: "#{exit_statement}\n"}
         if exit_code == 137
           send_and_store client_socket, {cmd: :status, status: :out_of_memory}
           @testrun[:status] = :out_of_memory
@@ -248,6 +248,11 @@ class SubmissionsController < ApplicationController
           Rails.logger.debug { "Runner error while scoring submission #{@submission.id}: #{e.message}" }
           @testrun[:passed] = false
           save_testrun_output 'assess'
+        rescue StandardError => e
+          Sentry.capture_exception(e)
+          raise e
+        ensure
+          ActiveRecord::Base.connection_pool.release_connection
         end
       end
     end
@@ -298,6 +303,7 @@ class SubmissionsController < ApplicationController
   def kill_client_socket(client_socket)
     # We don't want to store this (arbitrary) exit command and redirect it ourselves
     client_socket.send_data JSON.dump({cmd: :exit})
+    client_socket.send_data nil, :close
     client_socket.close
   end
 
@@ -306,8 +312,8 @@ class SubmissionsController < ApplicationController
     exercise_id = @submission.exercise_id
 
     remote_evaluation_mapping = RemoteEvaluationMapping.create(
-      user: user,
-      exercise_id: exercise_id,
+      user:,
+      exercise_id:,
       study_group_id: session[:study_group_id]
     )
 
@@ -369,7 +375,7 @@ class SubmissionsController < ApplicationController
     testrun = Testrun.create!(
       file: @file,
       passed: @testrun[:passed],
-      cause: cause,
+      cause:,
       submission: @submission,
       exit_code: @testrun[:exit_code], # might be nil, e.g., when the run did not finish
       status: @testrun[:status] || :failed,
@@ -378,7 +384,7 @@ class SubmissionsController < ApplicationController
       waiting_for_container_time: @testrun[:waiting_for_container_time]
     )
     TestrunMessage.create_for(testrun, @testrun[:messages])
-    TestrunExecutionEnvironment.create(testrun: testrun, execution_environment: @submission.used_execution_environment)
+    TestrunExecutionEnvironment.create(testrun:, execution_environment: @submission.used_execution_environment)
   end
 
   def send_hints(tubesock, errors)
@@ -429,14 +435,14 @@ class SubmissionsController < ApplicationController
       parsed[:stream] = parsed[:stream].to_sym if parsed.key? :stream
       parsed
     else
-      {cmd: :write, stream: stream, data: data}
+      {cmd: :write, stream:, data:}
     end
   rescue JSON::ParserError
-    {cmd: :write, stream: stream, data: data}
+    {cmd: :write, stream:, data:}
   end
 
   def augment_files_for_download(files)
-    submission_files = @submission.collect_files
+    submission_files = @submission.collect_files + @submission.exercise.files
     files.filter_map do |file|
       # Reject files that were already present in the submission
       # We further reject files that share the same name (excl. file extension) and path as a file in the submission

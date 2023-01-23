@@ -56,24 +56,25 @@ describe Lti do
     it 'returns to the tool consumer' do
       message = I18n.t('sessions.oauth.invalid_consumer')
       expect(controller).to receive(:return_to_consumer).with(lti_errorlog: message, lti_errormsg: I18n.t('sessions.oauth.failure'))
-      controller.send(:refuse_lti_launch, message: message)
+      controller.send(:refuse_lti_launch, message:)
     end
   end
 
   describe '#return_to_consumer' do
     context 'with a return URL' do
       let(:consumer_return_url) { 'https://example.org' }
+      let(:provider) { instance_double(IMS::LTI::ToolProvider, launch_presentation_return_url: consumer_return_url) }
 
-      before { allow(controller).to receive(:params).and_return(launch_presentation_return_url: consumer_return_url) }
+      before { controller.instance_variable_set(:@provider, provider) }
 
       it 'redirects to the tool consumer' do
-        expect(controller).to receive(:redirect_to).with(consumer_return_url)
+        expect(controller).to receive(:redirect_to).with(consumer_return_url, allow_other_host: true)
         controller.send(:return_to_consumer)
       end
 
       it 'passes messages to the consumer' do
         message = I18n.t('sessions.oauth.failure')
-        expect(controller).to receive(:redirect_to).with("#{consumer_return_url}?lti_errorlog=#{CGI.escape(message)}")
+        expect(controller).to receive(:redirect_to).with("#{consumer_return_url}?lti_errorlog=#{CGI.escape(message)}", allow_other_host: true)
         controller.send(:return_to_consumer, lti_errorlog: message)
       end
     end
@@ -174,14 +175,14 @@ describe Lti do
       controller.instance_variable_set(:@exercise, create(:fibonacci))
       expect(controller.session).to receive(:[]=).with(:external_user_id, anything)
       expect(controller.session).to receive(:[]=).with(:lti_parameters_id, anything)
-      controller.send(:store_lti_session_data, consumer: build(:consumer), parameters: parameters)
+      controller.send(:store_lti_session_data, consumer: build(:consumer), parameters:)
     end
 
     it 'creates an LtiParameter Object' do
       before_count = LtiParameter.count
       controller.instance_variable_set(:@current_user, create(:external_user))
       controller.instance_variable_set(:@exercise, create(:fibonacci))
-      controller.send(:store_lti_session_data, consumer: build(:consumer), parameters: parameters)
+      controller.send(:store_lti_session_data, consumer: build(:consumer), parameters:)
       expect(LtiParameter.count).to eq(before_count + 1)
     end
   end
