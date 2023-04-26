@@ -7,6 +7,11 @@ de:
         name: Name
         oauth_key: OAuth Key
         oauth_secret: OAuth Secret
+        rfc_visibility: Sichtbarkeit von Kommentaranfragen
+        rfc_visibility_type:
+          all: Alle Kommentaranfrage sind sichtbar
+          consumer: Nur Kommentaranfragen des aktuellen Konsumenten sind sichtbar
+          study_group: Nur Kommentaranfragen der aktuellen Lerngruppe sind sichtbar
       execution_environment:
         docker_image: Docker-Image
         exposed_ports: Zugängliche Ports
@@ -865,6 +870,8 @@ de:
       general_help: Allgemeine Hilfe
       headline: Hilfe
       link: Hilfe
+      imprint: Impressum
+      privacy_policy: Datenschutzerklärung
     index: Index
     message_failure: Leider ist ein Fehler auf unserer Plattform aufgetreten. Bitte probieren Sie es später noch einmal.
     websocket_failure: Leider ist ein Verbindungsproblem aufgetreten. <a href="https://websocketstest.com" target="_blank" rel="noopener">Bitte überprüfen Sie Websocket-Verbindungen mit diesem Tool</a> und versuchen Sie es erneut.

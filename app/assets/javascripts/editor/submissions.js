@@ -111,8 +111,8 @@ CodeOceanEditorSubmissions = {
     });
   },
 
-  resetCode: function(onlyActiveFile = false) {
-    this.showSpinner(this);
+  resetCode: function(initiator, onlyActiveFile = false) {
+    this.showSpinner(initiator);
     this.ajax({
       method: 'GET',
       url: $('#start-over').data('url') || $('#start-over-active-file').data('url')
@@ -202,21 +202,22 @@ CodeOceanEditorSubmissions = {
 
   submitCode: function(event) {
     const button = $(event.target) || $('#submit');
+    this.teardownEventHandlers();
     this.createSubmission(button, null, function (response) {
       if (response.redirect) {
-        this.unloadAutoSave();
+        this.autosaveIfChanged();
+        this.stopCode(event);
         this.editors = [];
         Turbolinks.clearCache();
         Turbolinks.visit(response.redirect);
       } else if (response.status === 'container_depleted') {
           this.showContainerDepletedMessage();
-          button.one('click', this.submitCode.bind(this));
       } else if (response.message) {
           $.flash.danger({
               text: response.message
           });
-          button.one('click', this.submitCode.bind(this));
       }
+      this.initializeEventHandlers();
     })
   },
 
@@ -228,13 +229,6 @@ CodeOceanEditorSubmissions = {
     this.autosaveTimer = setTimeout(this.autosave.bind(this), this.AUTOSAVE_INTERVAL);
   },
 
-  unloadAutoSave: function() {
-    if(this.autosaveTimer != null){
-      clearTimeout(this.autosaveTimer);
-      this.autosave();
-    }
-  },
-
   updateSaveStateLabel: function() {
     var date = new Date();
     var autosaveLabel = $(this.autosaveLabel);
@@ -243,7 +237,15 @@ CodeOceanEditorSubmissions = {
     autosaveLabel.text(date.toLocaleTimeString());
   },
 
+  autosaveIfChanged: function() {
+    // Only save if the user has changed the code in the meantime (represented by an active timer)
+    if(this.autosaveTimer != null){
+      this.autosave();
+    }
+  },
+
   autosave: function () {
+    clearTimeout(this.autosaveTimer);
     this.autosaveTimer = null;
     this.createSubmission($('#autosave'), null);
   }

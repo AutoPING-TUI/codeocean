@@ -15,42 +15,72 @@ class RequestForCommentsController < ApplicationController
   # GET /request_for_comments
   # GET /request_for_comments.json
   def index
-    @search = RequestForComment
+    @search = policy_scope(RequestForComment)
       .last_per_user(2)
-      .with_last_activity
-      .ransack(params[:q])
-    @request_for_comments = @search.result
       .joins(:exercise)
       .where(exercises: {unpublished: false})
-      .includes(submission: [:study_group])
-      .order('created_at DESC')
-      .paginate(page: params[:page], per_page: per_page_param, total_entries: @search.result.length)
+      .order(created_at: :desc) # Order for the LIMIT part of the query
+      .ransack(params[:q])
+
+    # This total is used later to calculate the total number of entries
+    request_for_comments = @search.result
+      # All conditions are included in the query, so get the number of requested records
+      .paginate(page: params[:page], per_page: per_page_param)
+
+    @request_for_comments = RequestForComment.where(id: request_for_comments)
+      .with_last_activity # expensive query, so we only do it for the current page
+      .includes(submission: %i[study_group exercise])
+      .includes(:file, :comments, :user)
+      .order(created_at: :desc) # Order for the view
+      # We need to manually enable the pagination links.
+      .extending(WillPaginate::ActiveRecord::RelationMethods)
+    @request_for_comments.current_page = WillPaginate::PageNumber(params[:page] || 1)
+    @request_for_comments.limit_value = per_page_param
+    @request_for_comments.total_entries = @search.result.length
 
     authorize!
   end
 
   # GET /my_request_for_comments
   def my_comment_requests
-    @search = RequestForComment
-      .with_last_activity
+    @search = policy_scope(RequestForComment)
       .where(user: current_user)
+      .order(created_at: :desc) # Order for the LIMIT part of the query
       .ransack(params[:q])
-    @request_for_comments = @search.result
-      .order('created_at DESC')
+
+    # This total is used later to calculate the total number of entries
+    request_for_comments = @search.result
+      # All conditions are included in the query, so get the number of requested records
       .paginate(page: params[:page], per_page: per_page_param)
+
+    @request_for_comments = RequestForComment.where(id: request_for_comments)
+      .with_last_activity
+      .includes(submission: %i[study_group exercise])
+      .includes(:file, :comments, :user)
+      .order(created_at: :desc) # Order for the view
+      # We need to manually enable the pagination links.
+      .extending(WillPaginate::ActiveRecord::RelationMethods)
+    @request_for_comments.current_page = WillPaginate::PageNumber(params[:page] || 1)
+    @request_for_comments.limit_value = per_page_param
+    @request_for_comments.total_entries = @search.result.length
+
     authorize!
     render 'index'
   end
 
   # GET /my_rfc_activity
   def rfcs_with_my_comments
-    @search = RequestForComment
+    # As we order by `last_comment`, we need to include `with_last_activity` in the original query.
+    # Therefore, the optimization chosen above doesn't work here.
+    @search = policy_scope(RequestForComment)
       .with_last_activity
       .joins(:comments) # we don't need to outer join here, because we know the user has commented on these
-      .where(comments: {user_id: current_user.id})
+      .where(comments: {user: current_user})
       .ransack(params[:q])
     @request_for_comments = @search.result
-      .order('last_comment DESC')
+      .includes(submission: [:study_group, :exercise, {files: %i[comments]}])
+      .includes(:user)
+      .order(last_comment: :desc)
       .paginate(page: params[:page], per_page: per_page_param)
     authorize!
     render 'index'
@@ -59,13 +89,13 @@ class RequestForCommentsController < ApplicationController
   # GET /exercises/:id/request_for_comments
   def rfcs_for_exercise
     exercise = Exercise.find(params[:exercise_id])
-    @search = RequestForComment
+    @search = policy_scope(RequestForComment)
       .with_last_activity
       .where(exercise_id: exercise.id)
       .ransack(params[:q])
     @request_for_comments = @search.result
       .joins(:exercise)
-      .order('last_comment DESC')
+      .order(last_comment: :desc)
       .paginate(page: params[:page], per_page: per_page_param)
     # let the exercise decide, whether its rfcs should be visible
     authorize(exercise)
@@ -155,8 +185,14 @@ class RequestForCommentsController < ApplicationController
   # The study groups are grouped by the current study group and other study groups of the user
   def set_study_group_grouping
     current_study_group = StudyGroup.find_by(id: session[:study_group_id])
-    my_study_groups = current_user.study_groups.reject {|group| group == current_study_group }
+    my_study_groups = case current_user.consumer.rfc_visibility
+                        when 'all' then current_user.study_groups.order(name: :desc)
+                        when 'consumer' then current_user.study_groups.where(consumer: current_user.consumer).order(name: :desc)
+                        when 'study_group' then current_study_group.present? ? Array(current_study_group) : []
+                        else raise "Unknown RfC Visibility #{current_user.consumer.rfc_visibility}"
+                      end
+
     @study_groups_grouping = [[t('request_for_comments.index.study_groups.current'), Array(current_study_group)],
-                              [t('request_for_comments.index.study_groups.my'), my_study_groups]]
+                              [t('request_for_comments.index.study_groups.my'), my_study_groups.reject {|group| group == current_study_group }]]
   end
 end

@@ -32,7 +32,6 @@ gem 'pagedown-bootstrap-rails'
 gem 'pg'
 gem 'proforma', github: 'openHPI/proforma', tag: 'v0.7.1'
 gem 'prometheus_exporter'
-gem 'pry-byebug'
 gem 'puma'
 gem 'pundit'
 gem 'rails', '~> 7.0.4'
@@ -40,14 +39,12 @@ gem 'rails_admin', '< 4.0.0'
 gem 'rails-i18n'
 gem 'rails-timeago'
 gem 'ransack'
-gem 'rest-client'
 gem 'rubytree'
 gem 'rubyzip'
 gem 'sass-rails'
-gem 'sd_notify' # Watchdog service monitoring for systemd, automatically used by Puma if this gem is installed
-gem 'shakapacker', '6.5.5'
+gem 'shakapacker', '6.6.0'
 gem 'slim-rails'
-gem 'sorcery' # Causes a deprecation warning in Rails 6.0+, see: https://github.com/Sorcery/sorcery/pull/255
+gem 'sorcery'
 gem 'sprockets-rails'
 gem 'telegraf'
 gem 'terser'
@@ -58,7 +55,8 @@ gem 'zxcvbn-ruby', require: 'zxcvbn'
 
 # Error Tracing
 gem 'mnemosyne-ruby'
-gem 'sentry-rails'
+gem 'stackprof' # Must be loaded before the Sentry SDK.
+gem 'sentry-rails' # rubocop:disable Bundler/OrderedGems
 gem 'sentry-ruby'
 
 group :development do
@@ -71,6 +69,7 @@ group :development, :staging do
   gem 'bootsnap', require: false
   gem 'letter_opener'
   gem 'listen'
+  gem 'pry-byebug'
   gem 'pry-rails'
   gem 'rack-mini-profiler'
   gem 'rubocop', require: false
@@ -81,14 +80,11 @@ group :development, :staging do
 end
 
 group :test do
-  gem 'autotest' # required by autotest-rails
-  gem 'autotest-rails'
   gem 'capybara'
   gem 'database_cleaner'
   gem 'headless'
   gem 'nyan-cat-formatter'
   gem 'rails-controller-testing'
-  gem 'rspec-autotest'
   gem 'rspec-collection_matchers'
   gem 'rspec-github', require: false
   gem 'rspec-rails'

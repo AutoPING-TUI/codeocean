@@ -20,7 +20,7 @@ Metrics/CyclomaticComplexity:
   Max: 20
 
 Metrics/PerceivedComplexity:
-  Max: 23
+  Max: 25
 
 # We don't want to change previous migrations...
 #
@@ -34,6 +34,9 @@ Rails/ReversibleMigration:
   Enabled: false
 
 Rails/NotNullColumn:
+  Enabled: false
+
+Rails/ThreeStateBooleanColumn:
   Enabled: false
 
 # The models need to be fixed anyway

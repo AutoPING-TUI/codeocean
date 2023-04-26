@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2023_01_20_185807) do
+ActiveRecord::Schema[7.0].define(version: 2023_03_20_220012) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_trgm"
   enable_extension "pgcrypto"
@@ -107,6 +107,7 @@ ActiveRecord::Schema[7.0].define(version: 2023_01_20_185807) do
     t.datetime "updated_at"
     t.string "oauth_key"
     t.string "oauth_secret"
+    t.integer "rfc_visibility", limit: 2, default: 0, null: false, comment: "Used as enum in Rails"
   end
 
   create_table "error_template_attributes", id: :serial, force: :cascade do |t|
@@ -386,6 +387,7 @@ ActiveRecord::Schema[7.0].define(version: 2023_01_20_185807) do
     t.text "thank_you_note"
     t.boolean "full_score_reached", default: false
     t.integer "times_featured", default: 0
+    t.index ["exercise_id", "created_at"], name: "index_unresolved_recommended_rfcs", where: "(((NOT solved) OR (solved IS NULL)) AND ((question IS NOT NULL) AND (question <> ''::text)))"
     t.index ["exercise_id"], name: "index_request_for_comments_on_exercise_id"
     t.index ["submission_id"], name: "index_request_for_comments_on_submission_id"
     t.index ["user_id", "user_type", "created_at"], name: "index_rfc_on_user_and_created_at", order: { created_at: :desc }
@@ -418,6 +420,7 @@ ActiveRecord::Schema[7.0].define(version: 2023_01_20_185807) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.boolean "match"
+    t.index ["structured_error_id"], name: "index_structured_error_attributes_on_structured_error_id"
   end
 
   create_table "structured_errors", id: :serial, force: :cascade do |t|
@@ -569,6 +572,25 @@ ActiveRecord::Schema[7.0].define(version: 2023_01_20_185807) do
     t.index ["user_type", "user_id"], name: "index_user_proxy_exercise_exercises_on_user"
   end
 
+  create_table "wk2020_until_rfc_reply", id: false, force: :cascade do |t|
+    t.integer "user_id"
+    t.integer "exercise_id"
+    t.interval "working_time_until_rfc_reply"
+  end
+
+  create_table "wk2020_with_wk_until_rfc", id: false, force: :cascade do |t|
+    t.string "external_user_id", limit: 255
+    t.integer "user_id"
+    t.integer "exercise_id"
+    t.float "max_score"
+    t.float "max_reachable_points"
+    t.interval "working_time"
+    t.interval "working_time_until_rfc"
+    t.interval "working_time_until_rfc_reply"
+    t.time "percentile75"
+    t.time "percentile90"
+  end
+
   add_foreign_key "authentication_tokens", "study_groups"
   add_foreign_key "community_solution_contributions", "community_solution_locks"
   add_foreign_key "community_solution_contributions", "community_solutions"
@@ -579,6 +601,11 @@ ActiveRecord::Schema[7.0].define(version: 2023_01_20_185807) do
   add_foreign_key "exercise_tips", "exercises"
   add_foreign_key "exercise_tips", "tips"
   add_foreign_key "remote_evaluation_mappings", "study_groups"
+  add_foreign_key "structured_error_attributes", "error_template_attributes"
+  add_foreign_key "structured_error_attributes", "structured_errors"
+  add_foreign_key "structured_errors", "error_templates"
+  add_foreign_key "structured_errors", "error_templates", name: "structured_errors_error_templates_id_fk"
+  add_foreign_key "structured_errors", "submissions"
   add_foreign_key "submissions", "study_groups"
   add_foreign_key "subscriptions", "study_groups"
   add_foreign_key "testrun_execution_environments", "execution_environments"

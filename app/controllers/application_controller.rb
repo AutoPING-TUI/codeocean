@@ -6,6 +6,8 @@ class ApplicationController < ActionController::Base
 
   MEMBER_ACTIONS = %i[destroy edit show update].freeze
   RENDER_HOST = CodeOcean::Config.new(:code_ocean).read[:render_host]
+  LEGAL_SETTINGS = CodeOcean::Config.new(:code_ocean).read[:legal] || {}
+  MONITORING_USER_AGENT = Regexp.compile(/updown\.io/).freeze
 
   before_action :deny_access_from_render_host
   after_action :verify_authorized, except: %i[welcome]
@@ -76,7 +78,6 @@ class ApplicationController < ActionController::Base
     Sentry.set_user(
       id: current_user.id,
       type: current_user.class.name,
-      username: current_user.displayname,
       consumer: current_user.consumer&.name
     )
   end
@@ -134,6 +135,7 @@ class ApplicationController < ActionController::Base
 
   def welcome
     # Show root page
+    redirect_to ping_index_path if MONITORING_USER_AGENT.match?(request.user_agent)
   end
 
   def load_embed_options

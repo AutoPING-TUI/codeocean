@@ -75,7 +75,7 @@ class ExercisesController < ApplicationController
 
   def index
     @search = policy_scope(Exercise).ransack(params[:q])
-    @exercises = @search.result.includes(:execution_environment, :user).order(:title).paginate(page: params[:page], per_page: per_page_param)
+    @exercises = @search.result.includes(:execution_environment, :user, :files, :exercise_tags).order(:title).paginate(page: params[:page], per_page: per_page_param)
     authorize!
   end
 
@@ -254,11 +254,11 @@ class ExercisesController < ApplicationController
 
   private :handle_file_uploads
 
-  def handle_exercise_tips
-    return unless exercise_params && exercise_params[:tips]
+  def handle_exercise_tips(tips_params)
+    return unless tips_params
 
     begin
-      exercise_tips = JSON.parse(exercise_params[:tips])
+      exercise_tips = JSON.parse(tips_params)
       # Order is important to ensure no foreign key restraints are violated during delete
       previous_exercise_tips = ExerciseTip.where(exercise: @exercise).select(:id).order(rank: :desc).ids
       remaining_exercise_tips = update_exercise_tips exercise_tips, nil, 1
@@ -366,7 +366,7 @@ class ExercisesController < ApplicationController
 
   def set_available_tips
     # Order of elements is important and will be kept
-    available_tips = ExerciseTip.where(exercise: @exercise).order(rank: :asc)
+    available_tips = ExerciseTip.where(exercise: @exercise).order(rank: :asc).includes(:tip)
 
     # Transform result set in a hash and prepare (temporary) children array.
     # The children array will contain the sorted list of nested tips,
@@ -429,11 +429,14 @@ class ExercisesController < ApplicationController
   def create
     @exercise = Exercise.new(exercise_params&.except(:tips))
     authorize!
-    handle_exercise_tips
     collect_set_and_unset_exercise_tags
+    tips_params = exercise_params&.dig(:tips)
     return if performed?
 
-    create_and_respond(object: @exercise, params: exercise_params_with_tags)
+    create_and_respond(object: @exercise, params: exercise_params_with_tags) do
+      # We first need to create the exercise before handling tips
+      handle_exercise_tips tips_params
+    end
   end
 
   def not_authorized_for_exercise(_exception)
@@ -457,7 +460,7 @@ class ExercisesController < ApplicationController
   private :set_execution_environments
 
   def set_exercise_and_authorize
-    @exercise = Exercise.find(params[:id])
+    @exercise = Exercise.includes(:exercise_tips, files: [:file_type]).find(params[:id])
     authorize!
   end
 
@@ -481,7 +484,7 @@ class ExercisesController < ApplicationController
   def collect_set_and_unset_exercise_tags
     @tags = policy_scope(Tag)
     checked_exercise_tags = @exercise.exercise_tags
-    checked_tags = checked_exercise_tags.collect(&:tag).to_set
+    checked_tags = checked_exercise_tags.to_set(&:tag)
     unchecked_tags = Tag.all.to_set.subtract checked_tags
     @exercise_tags = checked_exercise_tags + unchecked_tags.collect do |tag|
       ExerciseTag.new(exercise: @exercise, tag:)
@@ -491,7 +494,7 @@ class ExercisesController < ApplicationController
   private :collect_set_and_unset_exercise_tags
 
   def update
-    handle_exercise_tips
+    handle_exercise_tips exercise_params&.dig(:tips)
     return if performed?
 
     update_and_respond(object: @exercise, params: exercise_params_with_tags)
@@ -589,7 +592,7 @@ class ExercisesController < ApplicationController
       redirect_after_submit
     else
       respond_to do |format|
-        format.html { redirect_to(implement_exercise_path(@submission.exercise)) }
+        format.html { redirect_to(implement_exercise_path(@submission.exercise, alert: I18n.t('exercises.submit.failure'))) }
         format.json { render(json: {message: I18n.t('exercises.submit.failure')}, status: :service_unavailable) }
       end
     end

@@ -1,7 +1,12 @@
 default: &default
+  # The following legal URLs are displayed in the help modal of the application.
+  # legal:
+    # imprint_url: https://open.hpi.de/pages/imprint
+    # privacy_policy_url: https://open.hpi.de/pages/data-protection
+
   # A public-facing host to be used for the render_file function of the SubmissionsController.
   # User content will be served from this host. If not set, the default host is used (less secure!).
-  # render_host: codeoceanusercontent.com
+  # render_host: codeocean.openhpiusercontent.de
 
   flowr:
     # When enabled, flowr can assist learners with related search results from
@@ -41,18 +46,18 @@ default: &default
     # When enabled, CodeOcean delegates the handling and management of (containerized) runners
     # to a dedicated runner management. Otherwise, code executions are performed locally using
     # Docker and without pre-warming support (one container per execution).
-    enabled: false
+    enabled: true
     # The strategy to use. Possible values are: poseidon, docker_container_pool
     strategy: poseidon
     # The root URL of the runner management to use (include any API prefix if required)
     # If a hostname is specified and the target host is reachable via IPv6, the WebSocket
     # connection might not use the IPv6-to-IPv4 fallback but rather fail unexpectedly.
-    url: https://runners.example.org/api/v1
+    url: http://127.0.0.1:7200/api/v1
     # The root certificate authority to trust for TLS connections to the runner management (Poseidon only)
-    ca_file: /example/certificates/ca.crt
+    # ca_file: /example/certificates/ca.crt
     # The authorization token for connections to the runner management (Poseidon only)
     # If TLS support is not enabled, this token is transmitted in clear text!
-    token: SECRET
+    # token: SECRET
     # The maximum time in seconds a runner may idle at the runner management before it is removed.
     # Each begin of an interaction with the runner resets this time. Thus, this value should
     # be truly greater than any permitted execution time of an execution environment.

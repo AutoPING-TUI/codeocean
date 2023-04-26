@@ -16,19 +16,8 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-      co_execenv_java:
-        image: openhpi/co_execenv_java:8-antlr
 
     steps:
-      - name: Configure Docker host
-        run: |
-          echo $'{"hosts": ["tcp://127.0.0.1:2376", "unix:///var/run/docker.sock"], "iptables": false, "live-restore": true}' | sudo tee /etc/docker/daemon.json
-          sudo mkdir -p /etc/systemd/system/docker.service.d
-          echo $'[Service]\nExecStart=\nExecStart=/usr/bin/dockerd --containerd /var/run/containerd/containerd.sock' | sudo tee /etc/systemd/system/docker.service.d/override.conf
-          sudo systemctl daemon-reload
-          sudo systemctl restart docker
-          docker restart $(docker ps -aq)
-
       - name: Checkout code
         uses: actions/checkout@v3
 
@@ -84,9 +73,13 @@ jobs:
         env:
           RAILS_ENV: test
           CC_TEST_REPORTER_ID: true
-          NODE_OPTIONS: --openssl-legacy-provider
         run: bundle exec rspec --color --format RSpec::Github::Formatter --format progress --require spec_helper --require rails_helper
 
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v3
+        if: ${{ success() || failure() }}
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
       - name: Send coverage to CodeClimate
         uses: paambaati/codeclimate-action@v3.2.0
         continue-on-error: true

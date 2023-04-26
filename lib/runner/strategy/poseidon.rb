@@ -27,12 +27,11 @@ class Runner::Strategy::Poseidon < Runner::Strategy
     case response.status
       when 200
         response_body = parse response
-        execution_environments = response_body[:executionEnvironments]
 
-        if execution_environments.nil?
-          raise(Runner::Error::UnexpectedResponse.new("Could not get the list of execution environments in Poseidon, got response: #{response.as_json}"))
+        if response_body.key? :executionEnvironments
+          response_body[:executionEnvironments] || []
         else
-          execution_environments
+          raise(Runner::Error::UnexpectedResponse.new("Could not get the list of execution environments in Poseidon, got response: #{response.as_json}"))
         end
       else
         handle_error response
@@ -214,6 +213,22 @@ class Runner::Strategy::Poseidon < Runner::Strategy
 
   def self.config
     @config ||= CodeOcean::Config.new(:code_ocean).read[:runner_management] || {}
+  end
+
+  def self.health
+    url = "#{config[:url]}/health"
+    Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Checking health from #{url}" }
+    response = http_connection.get url
+    case response.status
+      when 204
+        true
+      else
+        raise Runner::Error::UnexpectedResponse.new("Poseidon sent unexpected response status code #{response.status}")
+    end
+  rescue Faraday::Error => e
+    raise Runner::Error::FaradayError.new("Request to Poseidon failed: #{e.inspect}")
+  ensure
+    Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Finished getting health information" }
   end
 
   def self.release

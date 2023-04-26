@@ -15,7 +15,7 @@ class Submission < ApplicationRecord
   belongs_to :study_group, optional: true
 
   has_many :testruns
-  has_many :structured_errors
+  has_many :structured_errors, dependent: :destroy
   has_many :comments, through: :files
 
   belongs_to :external_users, lambda {
@@ -128,14 +128,19 @@ class Submission < ApplicationRecord
     (user_id + exercise.created_at.to_i) % 10 == 1
   end
 
-  def own_unsolved_rfc
-    RequestForComment.unsolved.find_by(exercise_id: exercise, user_id:)
+  def own_unsolved_rfc(user = self.user)
+    Pundit.policy_scope(user, RequestForComment).unsolved.find_by(exercise_id: exercise, user_id:)
   end
 
-  def unsolved_rfc
-    RequestForComment.unsolved.where(exercise_id: exercise).where.not(question: nil).where(created_at: OLDEST_RFC_TO_SHOW.ago..Time.current).order('RANDOM()').find do |rfc_element|
-      ((rfc_element.comments_count < MAX_COMMENTS_ON_RECOMMENDED_RFC) && !rfc_element.question.empty?)
-    end
+  def unsolved_rfc(user = self.user)
+    Pundit.policy_scope(user, RequestForComment)
+      .unsolved.where.not(question: [nil, ''])
+      .where(exercise_id: exercise, created_at: OLDEST_RFC_TO_SHOW.ago...)
+      .left_joins(:comments)
+      .having('COUNT(comments.id) < ?', MAX_COMMENTS_ON_RECOMMENDED_RFC)
+      .group(:id)
+      .order('RANDOM()').limit(1)
+      .first
   end
 
   # @raise [Runner::Error] if the score could not be calculated due to a failure with the runner.

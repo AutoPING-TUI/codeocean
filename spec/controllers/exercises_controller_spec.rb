@@ -268,11 +268,11 @@ describe ExercisesController do
     context 'when viewing the default submission statistics page without a parameter' do
       it 'does not list autosaved submissions' do
         perform_request
-        expect(assigns(:all_events).filter {|event| event.is_a? Submission }).to match_array [
+        expect(assigns(:all_events).filter {|event| event.is_a? Submission }).to contain_exactly(
           an_object_having_attributes(cause: 'run', user_id: external_user.id),
           an_object_having_attributes(cause: 'assess', user_id: external_user.id),
-          an_object_having_attributes(cause: 'run', user_id: external_user.id),
-        ]
+          an_object_having_attributes(cause: 'run', user_id: external_user.id)
+        )
       end
     end
 
@@ -414,11 +414,11 @@ describe ExercisesController do
 
     it 'renders the correct contents as json' do
       post_request
-      expect(JSON.parse(response.body).symbolize_keys[:message]).to eq('message')
-      expect(JSON.parse(response.body).symbolize_keys[:actions]).to(
+      expect(response.parsed_body.symbolize_keys[:message]).to eq('message')
+      expect(response.parsed_body.symbolize_keys[:actions]).to(
         include('button').and(include('Abort').and(include('Export')))
       )
-      expect(JSON.parse(response.body).symbolize_keys[:actions]).to(
+      expect(response.parsed_body.symbolize_keys[:actions]).to(
         not_include('Retry').and(not_include('Hide'))
       )
     end
@@ -428,11 +428,11 @@ describe ExercisesController do
 
       it 'renders the correct contents as json' do
         post_request
-        expect(JSON.parse(response.body).symbolize_keys[:message]).to eq('message')
-        expect(JSON.parse(response.body).symbolize_keys[:actions]).to(
+        expect(response.parsed_body.symbolize_keys[:message]).to eq('message')
+        expect(response.parsed_body.symbolize_keys[:actions]).to(
           include('button').and(include('Abort')).and(include('Retry'))
         )
-        expect(JSON.parse(response.body).symbolize_keys[:actions]).to(
+        expect(response.parsed_body.symbolize_keys[:actions]).to(
           not_include('Export').and(not_include('Hide'))
         )
       end
@@ -443,11 +443,11 @@ describe ExercisesController do
 
       it 'renders the correct contents as json' do
         post_request
-        expect(JSON.parse(response.body).symbolize_keys[:message]).to eq('message')
-        expect(JSON.parse(response.body).symbolize_keys[:actions]).to(
+        expect(response.parsed_body.symbolize_keys[:message]).to eq('message')
+        expect(response.parsed_body.symbolize_keys[:actions]).to(
           include('button').and(include('Abort'))
         )
-        expect(JSON.parse(response.body).symbolize_keys[:actions]).to(
+        expect(response.parsed_body.symbolize_keys[:actions]).to(
           not_include('Retry').and(not_include('Export')).and(not_include('Hide'))
         )
       end
@@ -471,10 +471,10 @@ describe ExercisesController do
       post_request
 
       expect(response).to have_http_status(:success)
-      expect(JSON.parse(response.body).symbolize_keys[:message]).to(include('successfully exported'))
-      expect(JSON.parse(response.body).symbolize_keys[:status]).to(eql('success'))
-      expect(JSON.parse(response.body).symbolize_keys[:actions]).to(include('button').and(include('Close')))
-      expect(JSON.parse(response.body).symbolize_keys[:actions]).to(not_include('Retry').and(not_include('Abort')))
+      expect(response.parsed_body.symbolize_keys[:message]).to(include('successfully exported'))
+      expect(response.parsed_body.symbolize_keys[:status]).to(eql('success'))
+      expect(response.parsed_body.symbolize_keys[:actions]).to(include('button').and(include('Close')))
+      expect(response.parsed_body.symbolize_keys[:actions]).to(not_include('Retry').and(not_include('Abort')))
     end
 
     context 'when an error occurs' do
@@ -483,10 +483,10 @@ describe ExercisesController do
       it 'renders correct response' do
         post_request
         expect(response).to have_http_status(:success)
-        expect(JSON.parse(response.body).symbolize_keys[:message]).to(include('failed').and(include('exampleerror')))
-        expect(JSON.parse(response.body).symbolize_keys[:status]).to(eql('fail'))
-        expect(JSON.parse(response.body).symbolize_keys[:actions]).to(include('button').and(include('Retry')).and(include('Close')))
-        expect(JSON.parse(response.body).symbolize_keys[:actions]).to(not_include('Abort'))
+        expect(response.parsed_body.symbolize_keys[:message]).to(include('failed').and(include('exampleerror')))
+        expect(response.parsed_body.symbolize_keys[:status]).to(eql('fail'))
+        expect(response.parsed_body.symbolize_keys[:actions]).to(include('button').and(include('Retry')).and(include('Close')))
+        expect(response.parsed_body.symbolize_keys[:actions]).to(not_include('Abort'))
       end
     end
   end
@@ -504,8 +504,8 @@ describe ExercisesController do
       post_request
       expect(response).to have_http_status(:success)
 
-      expect(JSON.parse(response.body).symbolize_keys[:uuid_found]).to be true
-      expect(JSON.parse(response.body).symbolize_keys[:update_right]).to be true
+      expect(response.parsed_body.symbolize_keys[:uuid_found]).to be true
+      expect(response.parsed_body.symbolize_keys[:update_right]).to be true
     end
 
     context 'when api_key is incorrect' do
@@ -524,8 +524,8 @@ describe ExercisesController do
         post_request
         expect(response).to have_http_status(:success)
 
-        expect(JSON.parse(response.body).symbolize_keys[:uuid_found]).to be true
-        expect(JSON.parse(response.body).symbolize_keys[:update_right]).to be false
+        expect(response.parsed_body.symbolize_keys[:uuid_found]).to be true
+        expect(response.parsed_body.symbolize_keys[:update_right]).to be false
       end
     end
 
@@ -536,7 +536,7 @@ describe ExercisesController do
         post_request
         expect(response).to have_http_status(:success)
 
-        expect(JSON.parse(response.body).symbolize_keys[:uuid_found]).to be false
+        expect(response.parsed_body.symbolize_keys[:uuid_found]).to be false
       end
     end
   end

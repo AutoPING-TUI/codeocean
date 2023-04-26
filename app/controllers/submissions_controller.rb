@@ -110,7 +110,7 @@ class SubmissionsController < ApplicationController
       client_socket = tubesock
 
       client_socket.onopen do |_event|
-        return kill_client_socket(client_socket) if @embed_options[:disable_run]
+        kill_client_socket(client_socket) and return true if @embed_options[:disable_run]
       end
 
       client_socket.onclose do |_event|
@@ -160,6 +160,9 @@ class SubmissionsController < ApplicationController
       end
     end
 
+    # If running is not allowed (and the socket is closed), we can stop here.
+    return true if @embed_options[:disable_run]
+
     @testrun[:output] = +''
     durations = @submission.run(@file) do |socket, starting_time|
       runner_socket = socket
@@ -178,7 +181,7 @@ class SubmissionsController < ApplicationController
         send_and_store client_socket, message
       end
 
-      runner_socket.on :exit do |exit_code, files|
+      runner_socket.on :exit do |exit_code|
         @testrun[:exit_code] = exit_code
         exit_statement =
           if @testrun[:output].empty? && exit_code.zero?
@@ -201,6 +204,10 @@ class SubmissionsController < ApplicationController
           @testrun[:status] = :out_of_memory
         end
 
+        # The client connection will be closed once the file listing finished.
+      end
+
+      runner_socket.on :files do |files|
         downloadable_files, = convert_files_json_to_files files
         if downloadable_files.present?
           js_tree = FileTree.new(downloadable_files).to_js_tree
@@ -220,6 +227,7 @@ class SubmissionsController < ApplicationController
     @testrun[:output] = "timeout: #{@testrun[:output]}"
     extract_durations(e)
   rescue Runner::Error => e
+    # Regardless of the specific error cause, we send a `container_depleted` status to the client.
     send_and_store client_socket, {cmd: :status, status: :container_depleted}
     close_client_connection(client_socket)
     @testrun[:status] ||= :container_depleted
@@ -231,31 +239,32 @@ class SubmissionsController < ApplicationController
   # rubocop:enable Metrics/CyclomaticComplexity:
 
   def score
-    hijack do |tubesock|
-      tubesock.onopen do |_event|
-        switch_locale do
-          return kill_client_socket(tubesock) if @embed_options[:disable_score] || !@submission.exercise.teacher_defined_assessment?
+    client_socket = nil
+    disable_scoring = @embed_options[:disable_score] || !@submission.exercise.teacher_defined_assessment?
 
-          # The score is stored separately, we can forward it to the client immediately
-          tubesock.send_data(JSON.dump(@submission.calculate_score))
-          # To enable hints when scoring a submission, uncomment the next line:
-          # send_hints(tubesock, StructuredError.where(submission: @submission))
-          kill_client_socket(tubesock)
-        rescue Runner::Error => e
-          extract_durations(e)
-          send_and_store tubesock, {cmd: :status, status: :container_depleted}
-          kill_client_socket(tubesock)
-          Rails.logger.debug { "Runner error while scoring submission #{@submission.id}: #{e.message}" }
-          @testrun[:passed] = false
-          save_testrun_output 'assess'
-        rescue StandardError => e
-          Sentry.capture_exception(e)
-          raise e
-        ensure
-          ActiveRecord::Base.connection_pool.release_connection
-        end
+    hijack do |tubesock|
+      client_socket = tubesock
+      tubesock.onopen do |_event|
+        kill_client_socket(tubesock) and return true if disable_scoring
       end
     end
+
+    # If scoring is not allowed (and the socket is closed), we can stop here.
+    return true if disable_scoring
+
+    # The score is stored separately, we can forward it to the client immediately
+    client_socket&.send_data(JSON.dump(@submission.calculate_score))
+    # To enable hints when scoring a submission, uncomment the next line:
+    # send_hints(client_socket, StructuredError.where(submission: @submission))
+    kill_client_socket(client_socket)
+  rescue Runner::Error => e
+    extract_durations(e)
+    send_and_store client_socket, {cmd: :status, status: :container_depleted}
+    kill_client_socket(client_socket)
+    Rails.logger.debug { "Runner error while scoring submission #{@submission.id}: #{e.message}" }
+    @testrun[:passed] = false
+  ensure
+    save_testrun_output 'assess'
   end
 
   def create
@@ -267,24 +276,29 @@ class SubmissionsController < ApplicationController
   def statistics; end
 
   def test
-    hijack do |tubesock|
-      tubesock.onopen do |_event|
-        switch_locale do
-          return kill_client_socket(tubesock) if @embed_options[:disable_run]
+    client_socket = nil
 
-          # The score is stored separately, we can forward it to the client immediately
-          tubesock.send_data(JSON.dump(@submission.test(@file)))
-          kill_client_socket(tubesock)
-        rescue Runner::Error => e
-          extract_durations(e)
-          send_and_store tubesock, {cmd: :status, status: :container_depleted}
-          kill_client_socket(tubesock)
-          Rails.logger.debug { "Runner error while testing submission #{@submission.id}: #{e.message}" }
-          @testrun[:passed] = false
-          save_testrun_output 'assess'
-        end
+    hijack do |tubesock|
+      client_socket = tubesock
+      tubesock.onopen do |_event|
+        kill_client_socket(tubesock) and return true if @embed_options[:disable_run]
       end
     end
+
+    # If running is not allowed (and the socket is closed), we can stop here.
+    return true if @embed_options[:disable_run]
+
+    # The score is stored separately, we can forward it to the client immediately
+    client_socket&.send_data(JSON.dump(@submission.test(@file)))
+    kill_client_socket(client_socket)
+  rescue Runner::Error => e
+    extract_durations(e)
+    send_and_store client_socket, {cmd: :status, status: :container_depleted}
+    kill_client_socket(client_socket)
+    Rails.logger.debug { "Runner error while testing submission #{@submission.id}: #{e.message}" }
+    @testrun[:passed] = false
+  ensure
+    save_testrun_output 'assess'
   end
 
   private
@@ -339,9 +353,17 @@ class SubmissionsController < ApplicationController
   def extract_errors
     results = []
     if @testrun[:output].present?
-      @submission.exercise.execution_environment.error_templates.each do |template|
+      # First, we test all error templates for a match.
+      matching_error_templates = @submission.exercise.execution_environment.error_templates.select do |template|
         pattern = Regexp.new(template.signature).freeze
-        results << StructuredError.create_from_template(template, @testrun[:output], @submission) if pattern.match(@testrun[:output])
+        pattern.match(@testrun[:output])
+      end
+      # Second, if there is a match, we preload all ErrorTemplateAttributes and create a StructuredError
+      #
+      # Reloading the ErrorTemplate is necessary to allow preloading the ErrorTemplateAttributes.
+      # However, this results in less (and faster) SQL queries than performing manual lookups.
+      ErrorTemplate.where(id: matching_error_templates).joins(:error_template_attributes).includes(:error_template_attributes).each do |template|
+        results << StructuredError.create_from_template(template, @testrun[:output], @submission)
       end
     end
     results

@@ -12,8 +12,9 @@ module SubmissionParameters
                         end
     submission_params = merge_user(submission_params)
     files_attributes = submission_params[:files_attributes]
-    exercise = Exercise.find_by(id: submission_params[:exercise_id])
+    exercise = @exercise || Exercise.find_by(id: submission_params[:exercise_id])
     submission_params[:files_attributes] = reject_illegal_file_attributes(exercise, files_attributes)
+    submission_params[:exercise] = exercise
     submission_params
   end
   private :submission_params
@@ -21,9 +22,8 @@ module SubmissionParameters
   def merge_user(params)
     # The study_group_id might not be present in the session (e.g. for internal users), resulting in session[:study_group_id] = nil which is intended.
     params.merge(
-      user_id: current_user.id,
-      user_type: current_user.class.name,
-      study_group_id: session[:study_group_id]
+      user: current_user,
+      study_group_id: current_user.current_study_group_id
     )
   end
 end
