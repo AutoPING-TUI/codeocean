@@ -10,13 +10,12 @@ class ExercisesController < ApplicationController
   before_action :handle_file_uploads, only: %i[create update]
   before_action :set_execution_environments, only: %i[index create edit new update]
   before_action :set_exercise_and_authorize,
-    only: MEMBER_ACTIONS + %i[clone implement working_times intervention search run statistics submit reload feedback
-                              requests_for_comments study_group_dashboard export_external_check export_external_confirm
+    only: MEMBER_ACTIONS + %i[clone implement working_times intervention statistics submit reload feedback
+                              study_group_dashboard export_external_check export_external_confirm
                               external_user_statistics]
   before_action :collect_set_and_unset_exercise_tags, only: MEMBER_ACTIONS
   before_action :set_external_user_and_authorize, only: [:external_user_statistics]
   before_action :set_file_types, only: %i[create edit new update]
-  before_action :set_course_token, only: [:implement]
   before_action :set_available_tips, only: %i[implement show new edit]
 
   skip_before_action :verify_authenticity_token, only: %i[import_task import_uuid_check]
@@ -44,7 +43,7 @@ class ExercisesController < ApplicationController
     authorize!
     @exercises = params[:exercises].values.map do |exercise_params|
       exercise = Exercise.find(exercise_params.delete(:id))
-      exercise.update(exercise_params)
+      exercise.update(exercise_params.permit(:public))
       exercise
     end
     render(json: {exercises: @exercises})
@@ -91,9 +90,12 @@ class ExercisesController < ApplicationController
 
   def feedback
     authorize!
-    @feedbacks = @exercise.user_exercise_feedbacks.paginate(page: params[:page], per_page: per_page_param)
+    @feedbacks = @exercise
+      .user_exercise_feedbacks
+      .includes(:exercise, user: [:programming_groups])
+      .paginate(page: params[:page], per_page: per_page_param)
     @submissions = @feedbacks.map do |feedback|
-      feedback.exercise.final_submission(feedback.user)
+      feedback.exercise.final_submission(feedback.user.programming_groups.select {|pg| pg.exercise = @exercise }.presence || feedback.user)
     end
   end
 
@@ -167,9 +169,9 @@ class ExercisesController < ApplicationController
       exercise.save!
       render json: {}, status: :created
     end
-  rescue Proforma::ExerciseNotOwned
+  rescue ProformaXML::ExerciseNotOwned
     render json: {}, status: :unauthorized
-  rescue Proforma::ProformaError
+  rescue ProformaXML::ProformaError
     render json: t('exercises.import_codeharbor.import_errors.invalid'), status: :bad_request
   rescue StandardError => e
     Sentry.capture_exception(e)
@@ -206,13 +208,13 @@ class ExercisesController < ApplicationController
                              :allow_file_creation,
                              :allow_auto_completion,
                              :title,
+                             :internal_title,
                              :expected_difficulty,
                              :tips,
                              files_attributes: file_attributes,
                              tag_ids: []
                            ).merge(
-                             user_id: current_user.id,
-                             user_type: current_user.class.name
+                             user: current_user
                            )
                          end
   end
@@ -298,10 +300,32 @@ class ExercisesController < ApplicationController
 
   private :update_exercise_tips
 
-  def implement
-    user_solved_exercise = @exercise.solved_by?(current_user)
-    count_interventions_today = UserExerciseIntervention.where(user: current_user).where('created_at >= ?',
-      Time.zone.now.beginning_of_day).count
+  def implement # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    if session[:pg_id] && current_contributor.exercise != @exercise
+      # we are acting on behalf of a programming group
+      if current_user.admin?
+        session.delete(:pg_id)
+        session.delete(:pair_programming)
+        @current_contributor = current_user
+      else
+        return redirect_back(
+          fallback_location: implement_exercise_path(current_contributor.exercise),
+          alert: t('exercises.implement.existing_programming_group', exercise: current_contributor.exercise.title)
+        )
+      end
+    elsif session[:pg_id].blank? && (pg = current_user.programming_groups.find_by(exercise: @exercise)) && pg.submissions.where(study_group_id: current_user.current_study_group_id).any?
+      # we are just acting on behalf of a single user who has already worked on this exercise as part of a programming group **in the context of the current study group**
+      session[:pg_id] = pg.id
+      @current_contributor = pg
+    elsif session[:pg_id].blank? && session[:pair_programming] == 'mandatory'
+      return redirect_back(fallback_location: new_exercise_programming_group_path(@exercise))
+    elsif session[:pg_id].blank? && session[:pair_programming] == 'optional' && current_user.submissions.where(study_group_id: current_user.current_study_group_id, exercise: @exercise).none?
+      Event.find_or_create_by(category: 'pp_work_alone', user: current_user, exercise: @exercise, data: nil, file_id: nil)
+      current_user.pair_programming_waiting_users&.find_by(exercise: @exercise)&.update(status: :worked_alone)
+    end
+
+    user_solved_exercise = @exercise.solved_by?(current_contributor)
+    count_interventions_today = UserExerciseIntervention.where(user: current_user).where(created_at: Time.zone.now.beginning_of_day..).count
     user_got_intervention_in_exercise = UserExerciseIntervention.where(user: current_user,
       exercise: @exercise).size >= max_intervention_count_per_exercise
     (user_got_enough_interventions = count_interventions_today >= max_intervention_count_per_day) || user_got_intervention_in_exercise
@@ -331,38 +355,10 @@ class ExercisesController < ApplicationController
 
     @hide_rfc_button = @embed_options[:disable_rfc]
 
-    @search = Search.new
-    @search.exercise = @exercise
-    @submission = current_user.submissions.where(exercise_id: @exercise.id).order('created_at DESC').first
+    @submission = current_contributor.submissions.order(created_at: :desc).find_by(exercise: @exercise)
     @files = (@submission ? @submission.collect_files : @exercise.files).select(&:visible).sort_by(&:filepath)
     @paths = collect_paths(@files)
-
-    @user_id = if current_user.respond_to? :external_id
-                 current_user.external_id
-               else
-                 current_user.id
-               end
   end
-
-  def set_course_token
-    lti_parameters = LtiParameter.where(external_users_id: current_user.id,
-      exercises_id: @exercise.id).last
-    if lti_parameters
-      lti_json = lti_parameters.lti_parameters['launch_presentation_return_url']
-
-      @course_token =
-        if lti_json.present? && (match = lti_json.match(%r{^.*courses/([a-z0-9-]+)/sections}))
-          match.captures.first
-        else
-          ''
-        end
-    else
-      # no consumer, therefore implementation with internal user
-      @course_token = '702cbd2a-c84c-4b37-923a-692d7d1532d0'
-    end
-  end
-
-  private :set_course_token
 
   def set_available_tips
     # Order of elements is important and will be kept
@@ -392,7 +388,7 @@ class ExercisesController < ApplicationController
   private :set_available_tips
 
   def working_times
-    working_time_accumulated = @exercise.accumulated_working_time_for_only(current_user)
+    working_time_accumulated = @exercise.accumulated_working_time_for_only(current_contributor)
     working_time_75_percentile = @exercise.get_quantiles([0.75]).first
     render(json: {working_time_75_percentile:,
                    working_time_accumulated:})
@@ -404,23 +400,11 @@ class ExercisesController < ApplicationController
       render(json: {success: 'false', error: "undefined intervention #{params[:intervention_type]}"})
     else
       uei = UserExerciseIntervention.new(
-        user: current_user, exercise: @exercise, intervention:,
-        accumulated_worktime_s: @exercise.accumulated_working_time_for_only(current_user)
+        user: current_contributor, exercise: @exercise, intervention:,
+        accumulated_worktime_s: @exercise.accumulated_working_time_for_only(current_contributor)
       )
       uei.save
       render(json: {success: 'true'})
-    end
-  end
-
-  def search
-    search_text = params[:search_text]
-    search = Search.new(user: current_user, exercise: @exercise, search: search_text)
-
-    begin
-      search.save
-      render(json: {success: 'true'})
-    rescue StandardError
-      render(json: {success: 'false', error: "could not save search: #{$ERROR_INFO}"})
     end
   end
 
@@ -441,7 +425,7 @@ class ExercisesController < ApplicationController
 
   def not_authorized_for_exercise(_exception)
     return render_not_authorized unless current_user
-    return render_not_authorized unless %w[implement working_times intervention search reload].include?(action_name)
+    return render_not_authorized unless %w[implement working_times intervention reload].include?(action_name)
 
     if current_user.admin? || current_user.teacher?
       redirect_to(@exercise, alert: t('exercises.implement.unpublished')) if @exercise.unpublished?
@@ -454,7 +438,7 @@ class ExercisesController < ApplicationController
   private :not_authorized_for_exercise
 
   def set_execution_environments
-    @execution_environments = ExecutionEnvironment.all.order(:name)
+    @execution_environments = ExecutionEnvironment.order(:name)
   end
 
   private :set_execution_environments
@@ -476,7 +460,7 @@ class ExercisesController < ApplicationController
   private :set_external_user_and_authorize
 
   def set_file_types
-    @file_types = FileType.all.order(:name)
+    @file_types = FileType.order(:name)
   end
 
   private :set_file_types
@@ -506,11 +490,11 @@ class ExercisesController < ApplicationController
 
   def statistics
     # Show general statistic page for specific exercise
-    user_statistics = {'InternalUser' => {}, 'ExternalUser' => {}}
+    contributor_statistics = {'InternalUser' => {}, 'ExternalUser' => {}, 'ProgrammingGroup' => {}}
 
-    query = Submission.select('user_id, user_type, MAX(score) AS maximum_score, COUNT(id) AS runs')
+    query = Submission.select('contributor_id, contributor_type, MAX(score) AS maximum_score, COUNT(id) AS runs')
       .where(exercise_id: @exercise.id)
-      .group('user_id, user_type')
+      .group('contributor_id, contributor_type')
 
     query = if policy(@exercise).detailed_statistics?
               query
@@ -522,11 +506,11 @@ class ExercisesController < ApplicationController
             end
 
     query.each do |tuple|
-      user_statistics[tuple['user_type']][tuple['user_id'].to_i] = tuple
+      contributor_statistics[tuple['contributor_type']][tuple['contributor_id'].to_i] = tuple
     end
 
     render locals: {
-      user_statistics:,
+      contributor_statistics:,
     }
   end
 
@@ -534,9 +518,9 @@ class ExercisesController < ApplicationController
     # Render statistics page for one specific external user
 
     if policy(@exercise).detailed_statistics?
-      submissions = Submission.where(user: @external_user, exercise: @exercise)
+      submissions = Submission.where(contributor: @external_user, exercise: @exercise)
         .in_study_group_of(current_user)
-        .order('created_at')
+        .order(:created_at)
       @show_autosaves = params[:show_autosaves] == 'true' || submissions.none? {|s| s.cause != 'autosave' }
       submissions = submissions.where.not(cause: 'autosave') unless @show_autosaves
       interventions = UserExerciseIntervention.where('user_id = ?  AND exercise_id = ?', @external_user.id,
@@ -551,7 +535,7 @@ class ExercisesController < ApplicationController
         @working_times_until.push((format_time_difference(@deltas[0..index].sum) if index.positive?))
       end
     else
-      final_submissions = Submission.where(user: @external_user,
+      final_submissions = Submission.where(contributor: @external_user,
         exercise_id: @exercise.id).in_study_group_of(current_user).final
       submissions = []
       %i[before_deadline within_grace_period after_late_deadline].each do |filter|
@@ -566,8 +550,9 @@ class ExercisesController < ApplicationController
 
   def submit
     @submission = Submission.create(submission_params)
-    @submission.calculate_score
-    if @submission.user.external_user? && lti_outcome_service?(@submission.exercise_id, @submission.user.id)
+    @submission.calculate_score(current_user)
+
+    if @submission.users.map {|user| lti_outcome_service?(@submission.exercise, user, @submission.study_group_id) }.any?
       transmit_lti_score
     else
       redirect_after_submit
@@ -576,25 +561,39 @@ class ExercisesController < ApplicationController
     Rails.logger.debug { "Runner error while submitting submission #{@submission.id}: #{e.message}" }
     respond_to do |format|
       format.html { redirect_to(implement_exercise_path(@submission.exercise)) }
-      format.json { render(json: {message: I18n.t('exercises.editor.depleted'), status: :container_depleted}) }
+      format.json { render(json: {danger: I18n.t('exercises.editor.depleted'), status: :container_depleted}) }
     end
   end
 
   def transmit_lti_score
-    response = send_score(@submission)
+    responses = send_scores(@submission)
+    messages = {}
+    failed_users = []
 
-    if response[:status] == 'success'
-      if response[:score_sent] != @submission.normalized_score
-        # Score has been reduced due to the passed deadline
-        flash.now[:warning] = I18n.t('exercises.submit.too_late')
-        flash.keep(:warning)
+    responses.each do |response|
+      if Lti::ERROR_STATUS.include? response[:status]
+        failed_users << response[:user]
+      elsif response[:score_sent] != @submission.normalized_score # the score was sent successfully, but received too late
+        messages[:warning] = I18n.t('exercises.submit.too_late')
       end
-      redirect_after_submit
+    end
+
+    if failed_users.size == responses.size # all submissions failed
+      messages[:danger] = I18n.t('exercises.submit.failure')
+    elsif failed_users.size.positive? # at least one submission failed
+      messages[:warning] = [[messages[:warning]], I18n.t('exercises.submit.warning_not_for_all_users_submitted', user: failed_users.join(', '))].join('<br><br>')
+      messages[:warning] = "#{messages[:warning]}\n\n#{I18n.t('exercises.submit.warning_not_for_all_users_submitted', user: failed_users.join(', '))}".strip
     else
-      respond_to do |format|
-        format.html { redirect_to(implement_exercise_path(@submission.exercise, alert: I18n.t('exercises.submit.failure'))) }
-        format.json { render(json: {message: I18n.t('exercises.submit.failure')}, status: :service_unavailable) }
+      messages.each do |type, message_text|
+        flash.now[type] = message_text
+        flash.keep(type)
       end
+      return redirect_after_submit
+    end
+
+    respond_to do |format|
+      format.html { redirect_to(implement_exercise_path(@submission.exercise), **messages) }
+      format.json { render(json: messages) } # We must not change the HTTP status code here, since otherwise the custom message is not displayed.
     end
   end
 

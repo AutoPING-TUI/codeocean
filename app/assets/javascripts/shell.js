@@ -67,7 +67,7 @@ $(document).on('turbolinks:load', function () {
 
             if (!output.stdout && !output.stderr) {
                 const element = $('<p>');
-                element.addClass('text-muted');
+                element.addClass('text-body-secondary');
                 element.text(log.data('message-no-output'));
                 log.append(element);
             }
@@ -99,13 +99,16 @@ $(document).on('turbolinks:load', function () {
             fileTree.removeClass('my-3 justify-content-center');
             fileTree.jstree({
                 'core': {
+                    'themes': {
+                        'name': window.getCurrentTheme() === "dark" ? "default-dark" : "default"
+                    },
                     'data': {
                         'url': function (node) {
                             const params = {sudo: sudo.is(':checked')};
                             return Routes.list_files_in_execution_environment_path(id, params);
                         },
                         'data': function (node) {
-                            return {'path': getPath(fileTree.jstree(), node)|| '/'};
+                            return {'path': getPath(fileTree.jstree(true), node)|| '/'};
                         }
                     }
                 }
@@ -130,6 +133,11 @@ $(document).on('turbolinks:load', function () {
                     window.location = downloadPath;
                 }
             }.bind(this));
+            $(document).on('theme:change', function(event) {
+                const newColorScheme = event.detail.currentTheme;
+                // Update the JStree theme
+                fileTree.jstree(true).set_theme(newColorScheme === "dark" ? "default-dark" : "default");
+            });
         }
     }
 
@@ -140,13 +148,22 @@ $(document).on('turbolinks:load', function () {
         }
 
         // We build the path to the file by concatenating the paths of all parent nodes.
-        let file_path = node.parents.reverse().map(function (id) {
+        let file_path = getParents(jstree, node.parent).map(function (id) {
             return jstree.get_text(id);
         }).filter(function (text) {
             return text !== false;
         }).join('/');
 
         return `${node.parent !== '#' ? '/' : ''}${file_path}${node.original.path}`;
+    }
+
+    const getParents = function (jstree, node_id) {
+        debugger;
+        if (node_id === '#') {
+            return ['#'];
+        }
+
+        return getParents(jstree, jstree.get_parent(node_id)).concat([node_id]);
     }
 
     const shell = $('#shell');
@@ -164,7 +181,7 @@ $(document).on('turbolinks:load', function () {
 
     const sudo = $('#sudo');
     sudo.on('change', function () {
-        sudo.parent().toggleClass('text-muted')
+        sudo.parent().toggleClass('text-body-secondary')
         command.focus();
     });
     $('#reload-files').on('click', function () {

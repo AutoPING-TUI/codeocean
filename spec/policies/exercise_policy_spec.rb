@@ -2,16 +2,18 @@
 
 require 'rails_helper'
 
-describe ExercisePolicy do
+RSpec.describe ExercisePolicy do
   subject(:policy) { described_class }
 
   let(:exercise) { build(:dummy, public: true) }
 
-  permissions :batch_update? do
-    it 'grants access to admins only' do
-      expect(policy).to permit(build(:admin), exercise)
-      %i[external_user teacher].each do |factory_name|
-        expect(policy).not_to permit(create(factory_name), exercise)
+  %i[batch_update? programming_groups_for_exercise?].each do |action|
+    permissions(action) do
+      it 'grants access to admins only' do
+        expect(policy).to permit(build(:admin), exercise)
+        %i[external_user teacher].each do |factory_name|
+          expect(policy).not_to permit(create(factory_name), exercise)
+        end
       end
     end
   end
@@ -134,7 +136,7 @@ describe ExercisePolicy do
     end
   end
 
-  %i[implement? working_times? intervention? search? reload?].each do |action|
+  %i[implement? working_times? intervention? reload?].each do |action|
     permissions(action) do
       context 'when the exercise has no visible files' do
         let(:exercise) { create(:dummy) }
@@ -188,7 +190,10 @@ describe ExercisePolicy do
 
   permissions :submit? do
     context 'when teacher-defined assessments are available' do
-      before { create(:test_file, context: exercise) }
+      before do
+        create(:test_file, context: exercise)
+        exercise.reload
+      end
 
       it 'grants access to anyone' do
         %i[admin external_user teacher].each do |factory_name|
@@ -215,7 +220,7 @@ describe ExercisePolicy do
       before do
         [admin, teacher].each do |user|
           [true, false].each do |public|
-            create(:dummy, public:, user_id: user.id, user_type: InternalUser.name)
+            create(:dummy, public:, user:)
           end
         end
       end
@@ -244,11 +249,11 @@ describe ExercisePolicy do
         end
 
         it 'includes all authored non-public exercises' do
-          expect(scope.map(&:id)).to include(*Exercise.where(public: false, user_id: teacher.id).map(&:id))
+          expect(scope.map(&:id)).to include(*Exercise.where(public: false, user: teacher).map(&:id))
         end
 
         it "does not include other authors' non-public exercises" do
-          expect(scope.map(&:id)).not_to include(*Exercise.where(public: false).where("user_id <> #{teacher.id}").map(&:id))
+          expect(scope.map(&:id)).not_to include(*Exercise.where(public: false).where.not(user: teacher).map(&:id))
         end
       end
     end

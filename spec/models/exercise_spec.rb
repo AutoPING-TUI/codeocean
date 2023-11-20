@@ -2,12 +2,12 @@
 
 require 'rails_helper'
 
-describe Exercise do
+RSpec.describe Exercise do
   let(:exercise) { described_class.create.tap {|exercise| exercise.update(public: nil, token: nil) } }
   let(:users) { create_list(:external_user, 10) }
 
   def create_submissions
-    create_list(:submission, 10, cause: 'submit', exercise:, score: Forgery(:basic).number, user: users.sample)
+    create_list(:submission, 10, cause: 'submit', exercise:, score: Forgery(:basic).number, contributor: users.sample)
   end
 
   it 'validates the number of main files' do
@@ -77,7 +77,10 @@ describe Exercise do
       before { create_submissions }
 
       it 'returns the average score expressed as a percentage' do
-        maximum_percentages = exercise.submissions.group_by(&:user_id).values.map {|submission| submission.max_by(&:score).score / exercise.maximum_score * 100 }
+        maximum_percentages = exercise.submissions.group_by do |s|
+                                [s.contributor_type,
+                                 s.contributor_id]
+                              end.values.map {|submission| submission.max_by(&:score).score / exercise.maximum_score * 100 }
         expect(exercise.average_percentage).to eq(maximum_percentages.average.round(2))
       end
     end
@@ -88,7 +91,7 @@ describe Exercise do
 
     context 'without submissions' do
       it 'returns nil' do
-        expect(exercise.average_score).to be 0
+        expect(exercise.average_score).to be 0.0
       end
     end
 
@@ -96,7 +99,10 @@ describe Exercise do
       before { create_submissions }
 
       it "returns the average of all users' maximum scores" do
-        maximum_scores = exercise.submissions.group_by(&:user_id).values.map {|submission| submission.max_by(&:score).score }
+        maximum_scores = exercise.submissions.group_by do |s|
+                           [s.contributor_type,
+                            s.contributor_id]
+                         end.values.map {|submission| submission.max_by(&:score).score }
         expect(exercise.average_score).to be_within(0.1).of(maximum_scores.average)
       end
     end
@@ -138,7 +144,7 @@ describe Exercise do
       before { create(:test_file, context: exercise) }
 
       it 'returns true' do
-        expect(exercise).to be_teacher_defined_assessment
+        expect(exercise.reload).to be_teacher_defined_assessment
       end
     end
 
@@ -146,7 +152,7 @@ describe Exercise do
       before { create(:test_file, context: exercise, role: 'teacher_defined_linter') }
 
       it 'returns true' do
-        expect(exercise).to be_teacher_defined_assessment
+        expect(exercise.reload).to be_teacher_defined_assessment
       end
     end
 
@@ -157,7 +163,7 @@ describe Exercise do
       end
 
       it 'returns true' do
-        expect(exercise).to be_teacher_defined_assessment
+        expect(exercise.reload).to be_teacher_defined_assessment
       end
     end
   end

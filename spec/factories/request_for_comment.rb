@@ -2,10 +2,10 @@
 
 FactoryBot.define do
   factory :rfc, class: 'RequestForComment' do
-    association :user, factory: :external_user
-    association :exercise, factory: :math
-    submission { association :submission, exercise:, user: }
-    association :file
+    user factory: :external_user
+    exercise factory: :math
+    submission { association :submission, exercise:, user:, study_group: user&.study_groups&.first }
+    file
     sequence :question do |n|
       "test question #{n}"
     end

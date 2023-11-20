@@ -2,7 +2,7 @@
 
 require 'rails_helper'
 
-describe SubmissionPolicy do
+RSpec.describe SubmissionPolicy do
   subject(:policy) { described_class }
 
   permissions :create? do
@@ -15,13 +15,23 @@ describe SubmissionPolicy do
 
   %i[download_file? render_file? run? score? show? statistics? stop? test?].each do |action|
     permissions(action) do
+      let(:exercise) { build(:math) }
+      let(:group_author) { build(:external_user) }
+      let(:other_group_author) { build(:external_user) }
+
       it 'grants access to admins' do
         expect(policy).to permit(build(:admin), Submission.new)
       end
 
       it 'grants access to authors' do
-        user = create(:external_user)
-        expect(policy).to permit(user, build(:submission, exercise: Exercise.new, user_id: user.id, user_type: user.class.name))
+        contributor = create(:external_user)
+        expect(policy).to permit(contributor, build(:submission, exercise:, contributor:))
+      end
+
+      it 'grants access to other authors of the programming group' do
+        contributor = build(:programming_group, exercise:, users: [group_author, other_group_author])
+        expect(policy).to permit(group_author, build(:submission, exercise:, contributor:))
+        expect(policy).to permit(other_group_author, build(:submission, exercise:, contributor:))
       end
     end
   end

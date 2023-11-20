@@ -20,3 +20,17 @@ updates:
     labels:
       - dependencies
       - javascript
+    groups:
+      sentry-javascript:
+        patterns:
+          - "@sentry*"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: daily
+      time: "03:00"
+      timezone: UTC
+    labels:
+      - dependencies
+      - github-actions

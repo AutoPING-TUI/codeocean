@@ -2,12 +2,12 @@
 
 require 'rails_helper'
 
-describe CodeOcean::FilesController do
+RSpec.describe CodeOcean::FilesController do
   render_views
 
-  let(:user) { create(:admin) }
+  let(:contributor) { create(:admin) }
 
-  before { allow(controller).to receive(:current_user).and_return(user) }
+  before { allow(controller).to receive(:current_user).and_return(contributor) }
 
   describe 'GET #show_protected_upload' do
     context 'with a valid filename' do
@@ -30,7 +30,7 @@ describe CodeOcean::FilesController do
   end
 
   describe 'POST #create' do
-    let(:submission) { create(:submission, user:) }
+    let(:submission) { create(:submission, contributor:) }
 
     context 'with a valid file' do
       let(:perform_request) { proc { post :create, params: {code_ocean_file: build(:file, context: submission).attributes, format: :json} } }
@@ -63,20 +63,21 @@ describe CodeOcean::FilesController do
   end
 
   describe 'DELETE #destroy' do
-    let(:exercise) { create(:fibonacci) }
-    let(:perform_request) { proc { delete :destroy, params: {id: exercise.files.first.id} } }
+    let!(:exercise) { create(:fibonacci) }
+    let(:perform_request) { proc { delete :destroy, params: {id: exercise.files.reject(&:main_file?).first.id} } }
 
-    before { perform_request.call }
+    context 'with request performed' do
+      before { perform_request.call }
 
-    expect_assigns(file: CodeOcean::File)
+      expect_assigns(file: CodeOcean::File)
 
-    it 'destroys the file' do
-      create(:fibonacci)
-      expect { perform_request.call }.to change(CodeOcean::File, :count).by(-1)
+      it 'redirects to exercise path' do
+        expect(controller).to redirect_to(exercise)
+      end
     end
 
-    it 'redirects to exercise path' do
-      expect(controller).to redirect_to(exercise)
+    it 'destroys the file' do
+      expect { perform_request.call }.to change(CodeOcean::File, :count).by(-1)
     end
   end
 end

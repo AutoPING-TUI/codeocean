@@ -8,14 +8,13 @@ RailsAdmin.config do |config|
   # config.authenticate_with do
   #   warden.authenticate! scope: :user
   # end
-  # config.current_user_method(&:current_user)
+  config.current_user_method(&:current_user)
 
   ## == CancanCan ==
   # config.authorize_with :cancancan
 
   ## == Pundit ==
   # config.authorize_with :pundit
-  config.parent_controller = '::RailsAdminController'
 
   config.authorize_with do
     # Important! We need to check the authorization here, we skip Pundit checks in the RailsAdminController.
@@ -30,9 +29,12 @@ RailsAdmin.config do |config|
 
   ### More at https://github.com/sferik/rails_admin/wiki/Base-configuration
 
+  config.parent_controller = '::RailsAdminController'
+  config.excluded_models = %w[Generators::TestingFrameworkAdapterGenerator]
+
   ## == Gravatar integration ==
   ## To disable Gravatar integration in Navigation Bar set to false
-  # config.show_gravatar = true
+  config.show_gravatar = false
 
   config.model 'CodeOcean::File' do
     list { limited_pagination true }
@@ -50,8 +52,6 @@ RailsAdmin.config do |config|
       end
     end
   end
-
-  config.excluded_models = %w[Generators::TestingFrameworkAdapterGenerator]
 
   config.actions do
     # mandatory

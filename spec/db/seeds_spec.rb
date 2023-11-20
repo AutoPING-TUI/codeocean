@@ -2,11 +2,16 @@
 
 require 'rails_helper'
 
-describe 'seeds' do
+RSpec.describe 'seeds' do
   subject(:seed) { Rake::Task['db:seed'].invoke }
 
   before do
     CodeOcean::Application.load_tasks
+
+    # We need to migrate the test database before seeding
+    # Otherwise, Rails 7.1+ will throw an `NoMethodError`: `pending_migrations.any?`
+    # See ActiveRecord gem, file `lib/active_record/railties/databases.rake`
+    Rake::Task['db:migrate'].invoke
 
     # We want to execute the seeds for the dev environment against the test database
     # rubocop:disable Rails/Inquiry

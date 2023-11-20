@@ -6,7 +6,7 @@ class Runner::Connection::Buffer
   # substring either in single or double quotes (e.g., within a JSON). Originally, each line break consists of `\r\n`.
   # We keep the `\r` at the end of the line (keeping "empty" lines) and replace it after buffering.
   # Inspired by https://stackoverflow.com/questions/13040585/split-string-by-spaces-properly-accounting-for-quotes-and-backslashes-ruby
-  SPLIT_INDIVIDUAL_LINES = Regexp.compile(/(?:"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|[^\n])+/)
+  SPLIT_INDIVIDUAL_LINES = /(?:"""(?:\\"|[^"])*"""|"(?!"")(?:\\"|[^"])*"|''(?:\\'|[^'])*'''|'(?!'')(?:\\'|[^'])*'|[#\\][^\r\n]*|(?:[^\r\n]|\r(?=\n)))+/
 
   def initialize
     @global_buffer = +''
@@ -51,7 +51,7 @@ class Runner::Connection::Buffer
     # We split lines by `\n` and want to normalize them to be separated by `\r\n`.
     # This allows us to identify a former line end with `\r` (as the `\n` is not matched)
     # All results returned from this buffer are normalized to feature `\n` line endings.
-    message_parts.encode(crlf_newline: true).scan(SPLIT_INDIVIDUAL_LINES).each do |line|
+    normalized_line_endings(message_parts).scan(SPLIT_INDIVIDUAL_LINES).each do |line|
       # Same argumentation as above: We can always append (previous empty or invalid)
       buffer += line
 
@@ -70,12 +70,29 @@ class Runner::Connection::Buffer
     buffer
   end
 
+  def normalized_line_endings(string)
+    # First, we ensure line endings are only represented by `\n`, regardless of the original line ending.
+    # Then, we convert all line endings to `\r\n` to ensure we can identify the `\r` at the end of a line.
+    # This "double conversion" is required to prevent line endings with \r\r\n.
+    normalized = string.encode(universal_newline: true).encode(crlf_newline: true)
+
+    # If the original input string ends with `\r`, it is incomplete and needs buffering.
+    # However, through our above normalization, the string would not end with `\r` anymore (but `\r\n`).
+    # Hence, in this case, we just remove the last character, so that all other line endings within the string remain unchanged.
+    if string.ends_with?("\r")
+      normalized[...-1]
+    else
+      normalized
+    end
+  end
+
   def add_to_line_buffer(message)
     @buffering = false
     @global_buffer = +''
     # For our buffering, we identified line breaks with the `\n` and removed those temporarily.
     # Thus, we now re-add the `\n` at the end of the string and remove the `\r` at the same time.
-    message = message.gsub(/\r$/, "\n")
+    # Still, some messages might still contain a `\r\n` within strings (e.g., received from Python for the linter).
+    message = message.gsub(/\r(?!\n)$/, "\n")
     @line_buffer.push message
   end
 
@@ -88,6 +105,8 @@ class Runner::Connection::Buffer
     return true if invalid_json && message.start_with?(/\s*{"cmd/)
     # Third, buffer the message if it contains long messages (e.g., an image or turtle batch commands)
     return true if invalid_json && (message.start_with?('<img') || message.include?('"turtlebatch"'))
+    # Fourth, if we have an odd number of quotes and no `\r` at the end, we might have an incomplete message
+    return true if (message.count('"').odd? || message.count("'").odd?) && !message.end_with?("\r")
 
     # If nothing applies, we don't want to buffer the current message
     false

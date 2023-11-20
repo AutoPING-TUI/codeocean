@@ -16,15 +16,31 @@ import 'jstree';
 import * as _ from 'underscore';
 import * as d3 from 'd3';
 import * as Sentry from '@sentry/browser';
+import * as SentryIntegration from '@sentry/integrations';
+import { startIdleTransaction, TRACING_DEFAULTS } from '@sentry/core';
+import { dynamicSamplingContextToSentryBaggageHeader } from '@sentry/utils';
 import 'sorttable';
 window.bootstrap = bootstrap; // Publish bootstrap in global namespace
 window._ = _; // Publish underscore's `_` in global namespace
 window.d3 = d3; // Publish d3 in global namespace
 window.Sentry = Sentry; // Publish sentry in global namespace
+window.SentryIntegrations = function() { // Publish sentry integration in global namespace
+    return [
+        new SentryIntegration.ReportingObserver(),
+        new SentryIntegration.ExtraErrorData(),
+        new SentryIntegration.HttpClient(),
+        new Sentry.BrowserProfilingIntegration(),
+        new Sentry.BrowserTracing(),
+        new Sentry.Replay(),
+    ]
+};
+window.SentryUtils = { dynamicSamplingContextToSentryBaggageHeader, startIdleTransaction, TRACING_DEFAULTS };
 
 // CSS
 import 'chosen-js/chosen.css';
+import 'chosen-dark.scss';
 import 'jstree/dist/themes/default/style.min.css';
+import 'jstree/dist/themes/default-dark/style.min.css';
 
 // custom jquery-ui library for minimal mouse interaction support
 import 'jquery-ui/ui/widget'
@@ -48,7 +64,7 @@ import { I18n } from "i18n-js";
 import locales from "../../tmp/locales.json";
 
 // Fetch user locale from html#lang.
-// This value is being set on `app/views/layouts/application.html.erb` and
+// This value is being set on `app/views/layouts/application.html.slim` and
 // is inferred from `ACCEPT-LANGUAGE` header.
 const userLocale = document.documentElement.lang;
 

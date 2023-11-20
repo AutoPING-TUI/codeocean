@@ -5,6 +5,7 @@ module RedirectBehavior
 
   def redirect_after_submit
     Rails.logger.debug { "Redirecting user with score:s #{@submission.normalized_score}" }
+
     if @submission.normalized_score.to_d == BigDecimal('1.0')
       if redirect_to_community_solution?
         redirect_to_community_solution
@@ -16,7 +17,6 @@ module RedirectBehavior
       # redirect 10 percent pseudorandomly to the feedback page
       if current_user.respond_to? :external_id
         if @submission.redirect_to_feedback? && !@embed_options[:disable_redirect_to_feedback]
-          clear_lti_session_data(@submission.exercise_id, @submission.user_id)
           redirect_to_user_feedback
           return
         end
@@ -27,7 +27,6 @@ module RedirectBehavior
           flash[:notice] = I18n.t('exercises.submit.full_score_redirect_to_own_rfc')
           flash.keep(:notice)
 
-          clear_lti_session_data(@submission.exercise_id, @submission.user_id)
           respond_to do |format|
             format.html { redirect_to(rfc) }
             format.json { render(json: {redirect: url_for(rfc)}) }
@@ -45,7 +44,6 @@ module RedirectBehavior
           # increase counter 'times_featured' in rfc
           rfc.increment(:times_featured)
 
-          clear_lti_session_data(@submission.exercise_id, @submission.user_id)
           respond_to do |format|
             format.html { redirect_to(rfc) }
             format.json { render(json: {redirect: url_for(rfc)}) }
@@ -56,7 +54,6 @@ module RedirectBehavior
     else
       # redirect to feedback page if score is less than 100 percent
       if @exercise.needs_more_feedback?(@submission) && !@embed_options[:disable_redirect_to_feedback]
-        clear_lti_session_data(@submission.exercise_id, @submission.user_id)
         redirect_to_user_feedback
       else
         redirect_to_lti_return_path
@@ -118,19 +115,16 @@ module RedirectBehavior
 
   def redirect_to_lti_return_path
     Sentry.set_extras(
-      consumers_id: @submission.user&.consumer,
-      external_users_id: @submission.user_id,
+      consumers_id: current_user.consumer_id,
+      external_users_id: current_user.id,
       exercises_id: @submission.exercise_id,
       session: session.to_hash,
       submission: @submission.inspect,
       params: params.as_json,
-      current_user:,
-      lti_exercise_id: session[:lti_exercise_id],
-      lti_parameters_id: session[:lti_parameters_id]
+      current_user:
     )
 
     path = lti_return_path(submission_id: @submission.id)
-    clear_lti_session_data(@submission.exercise_id, @submission.user_id)
     respond_to do |format|
       format.html { redirect_to(path) }
       format.json { render(json: {redirect: path}) }

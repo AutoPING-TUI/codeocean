@@ -6,7 +6,7 @@ class Controller < AnonymousController
   include Lti
 end
 
-describe Lti do
+RSpec.describe Lti do
   let(:controller) { Controller.new }
   let(:session) { double }
 
@@ -14,17 +14,6 @@ describe Lti do
     it 'instantiates a tool provider' do
       expect(IMS::LTI::ToolProvider).to receive(:new)
       controller.send(:build_tool_provider, consumer: build(:consumer), parameters: {})
-    end
-  end
-
-  describe '#clear_lti_session_data' do
-    it 'clears the session' do
-      expect(controller.session).to receive(:delete).with(:external_user_id)
-      expect(controller.session).to receive(:delete).with(:study_group_id)
-      expect(controller.session).to receive(:delete).with(:embed_options)
-      expect(controller.session).to receive(:delete).with(:lti_exercise_id)
-      expect(controller.session).to receive(:delete).with(:lti_parameters_id)
-      controller.send(:clear_lti_session_data)
     end
   end
 
@@ -103,19 +92,19 @@ describe Lti do
     end
   end
 
-  describe '#send_score' do
+  describe '#send_scores' do
     let(:consumer) { create(:consumer) }
     let(:score) { 0.5 }
     let(:submission) { create(:submission) }
 
     before do
-      create(:lti_parameter, consumers_id: consumer.id, external_users_id: submission.user_id, exercises_id: submission.exercise_id)
+      create(:lti_parameter, external_user: submission.contributor, exercise: submission.exercise)
     end
 
     context 'with an invalid score' do
       it 'raises an exception' do
         allow(submission).to receive(:normalized_score).and_return Lti::MAXIMUM_SCORE * 2
-        expect { controller.send(:send_score, submission) }.to raise_error(Lti::Error)
+        expect { controller.send(:send_scores, submission) }.to raise_error(Lti::Error)
       end
     end
 
@@ -125,13 +114,13 @@ describe Lti do
           it 'returns a corresponding status' do
             allow_any_instance_of(IMS::LTI::ToolProvider).to receive(:outcome_service?).and_return(false)
             allow(submission).to receive(:normalized_score).and_return score
-            expect(controller.send(:send_score, submission)[:status]).to eq('unsupported')
+            expect(controller.send(:send_scores, submission).first[:status]).to eq('unsupported')
           end
         end
 
         context 'when grading is supported' do
           let(:response) { double }
-          let(:send_score) { controller.send(:send_score, submission) }
+          let(:send_scores) { controller.send(:send_scores, submission).first }
 
           before do
             allow_any_instance_of(IMS::LTI::ToolProvider).to receive(:outcome_service?).and_return(true)
@@ -145,23 +134,23 @@ describe Lti do
 
           it 'sends the score' do
             expect_any_instance_of(IMS::LTI::ToolProvider).to receive(:post_replace_result!).with(score)
-            send_score
+            send_scores
           end
 
           it 'returns code, message, and status' do
-            expect(send_score[:code]).to eq(response.response_code)
-            expect(send_score[:message]).to eq(response.body)
-            expect(send_score[:status]).to eq(response.code_major)
+            expect(send_scores[:code]).to eq(response.response_code)
+            expect(send_scores[:message]).to eq(response.body)
+            expect(send_scores[:status]).to eq(response.code_major)
           end
         end
       end
 
       context 'without a tool consumer' do
         it 'returns a corresponding status' do
-          submission.user.consumer = nil
+          submission.contributor.consumer = nil
 
           allow(submission).to receive(:normalized_score).and_return score
-          expect(controller.send(:send_score, submission)[:status]).to eq('error')
+          expect(controller.send(:send_scores, submission).first[:status]).to eq('error')
         end
       end
     end
@@ -174,16 +163,16 @@ describe Lti do
       controller.instance_variable_set(:@current_user, create(:external_user))
       controller.instance_variable_set(:@exercise, create(:fibonacci))
       expect(controller.session).to receive(:[]=).with(:external_user_id, anything)
-      expect(controller.session).to receive(:[]=).with(:lti_parameters_id, anything)
-      controller.send(:store_lti_session_data, consumer: build(:consumer), parameters:)
+      expect(controller.session).to receive(:[]=).with(:pair_programming, anything)
+      controller.send(:store_lti_session_data, parameters)
     end
 
     it 'creates an LtiParameter Object' do
-      before_count = LtiParameter.count
-      controller.instance_variable_set(:@current_user, create(:external_user))
-      controller.instance_variable_set(:@exercise, create(:fibonacci))
-      controller.send(:store_lti_session_data, consumer: build(:consumer), parameters:)
-      expect(LtiParameter.count).to eq(before_count + 1)
+      expect do
+        controller.instance_variable_set(:@current_user, create(:external_user))
+        controller.instance_variable_set(:@exercise, create(:fibonacci))
+        controller.send(:store_lti_session_data, parameters)
+      end.to change(LtiParameter, :count).by(1)
     end
   end
 

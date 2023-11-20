@@ -3,16 +3,35 @@
      Otherwise, lti_parameters might be nil
   meta name="turbolinks-cache-control" content="no-cache"
 
-// col-md-12 required for CodePilot
-#editor-column.col-md-12
+#editor-column
   - unless @embed_options[:hide_exercise_description]
     .exercise.clearfix
-      div
-        span.badge.rounded-pill.bg-primary.float-end.score
+      div.col-9div.d-lg-flex.flex-row.justify-content-between.align-items-baseline
+        div.col-lg-7
+          h1 id="exercise-headline"
+            i id="description-symbol" class=(@embed_options[:collapse_exercise_description] ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down')
+            = @exercise.title
 
-        h1 id="exercise-headline"
-          i id="description-symbol" class=(@embed_options[:collapse_exercise_description] ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down')
-          = @exercise.title
+        div.col-lg-5.float-lg-end.ms-md-3.mb-md-3.d-flex.justify-content-end.pe-lg-3
+          - if current_contributor.programming_group?
+            span.me-3.mt-1
+              button.btn.btn-sm.btn-primary.text-nowrap.w-100#start_chat data= { url: "https://jitsi.fem.tu-ilmenau.de/openHPI_ProgrammingGroup#{current_contributor.id}" }
+                i.fa-solid.fa-video
+                = t('exercises.editor.start_video')
+
+              div.small.text-body-tertiary.text-nowrap.mt-1
+                a href='https://www.tu-ilmenau.de/datenschutz' target='_blank' rel='noopener'
+                  = t('exercises.implement.external_privacy_policy')
+
+            span.me-3.mt-1
+              button.btn.btn-sm.btn-secondary.text-nowrap#info data-bs-toggle= 'modal' data-bs-target= '#modal-info-pair-programming'
+                i.fa-solid.fa-circle-info
+                = t('programming_groups.new.pair_programming_info')
+
+            span.badge.rounded-pill.bg-primary.float-end.mt-2.mb-5.score
+
+          - if !current_contributor.programming_group?
+            span.badge.rounded-pill.bg-primary.float-end.mt-2.score
 
       #description-card.lead class=(@embed_options[:collapse_exercise_description] ? 'description-card-collapsed' : 'description-card')
         = render_markdown(@exercise.description)
@@ -25,9 +44,4 @@
 
 
   = render('editor', exercise: @exercise, files: @files, submission: @submission)
-
-- if qa_url
-  #questions-column
-    #questions-holder data-url="#{qa_url}/qa/index/#{@exercise.id}/#{@user_id}"
-  = qa_js_tag
-
+  = render('shared/modal', classes: 'modal-lg', id: 'modal-info-pair-programming', template: 'programming_groups/_info_pair_programming', title: t('programming_groups.new.pair_programming_info'))

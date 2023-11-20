@@ -29,7 +29,7 @@ class TipsController < ApplicationController
     params[:tip]
       .permit(:title, :description, :example, :file_type_id)
       .each {|_key, value| value.strip! unless value.is_a?(Array) }
-      .merge(user_id: current_user.id, user_type: current_user.class.name)
+      .merge(user: current_user)
   end
   private :tip_params
 
@@ -56,7 +56,7 @@ class TipsController < ApplicationController
   end
 
   def set_file_types
-    @file_types = FileType.all.order(:name)
+    @file_types = FileType.order(:name)
   end
   private :set_file_types
 end

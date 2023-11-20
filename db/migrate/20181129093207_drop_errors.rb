@@ -11,8 +11,8 @@ class DropErrors < ActiveRecord::Migration[5.2]
 
       validates :message, presence: true
 
-      def self.nested_resource?
-        true
+      def self.parent_resource
+        ExecutionEnvironment
       end
 
       delegate :to_s, to: :id
@@ -24,7 +24,7 @@ class DropErrors < ActiveRecord::Migration[5.2]
     submissions_controller = SubmissionsController.new
 
     # Iterate only over those Errors containing a message and submission_id
-    CodeOcean::Error.where.not(message: [nil, '']).where.not(submission_id: [nil, '']).each do |error|
+    CodeOcean::Error.where.not(message: [nil, '']).where.not(submission_id: [nil, '']).find_each do |error|
       raw_output = error.message
       submission = Submission.find_by(id: error.submission_id)
 

@@ -22,7 +22,7 @@ class SubmissionsController < ApplicationController
 
   def index
     @search = Submission.ransack(params[:q])
-    @submissions = @search.result.includes(:exercise, :user).paginate(page: params[:page], per_page: per_page_param)
+    @submissions = @search.result.includes(:exercise, :contributor).paginate(page: params[:page], per_page: per_page_param)
     authorize!
   end
 
@@ -99,8 +99,7 @@ class SubmissionsController < ApplicationController
     end
   end
 
-  # rubocop:disable Metrics/CyclomaticComplexity
-  def run
+  def run # rubocop:disable Metrics/PerceivedComplexity, Metrics/CyclomaticComplexity
     # These method-local socket variables are required in order to use one socket
     # in the callbacks of the other socket. As the callbacks for the client socket
     # are registered first, the runner socket may still be nil.
@@ -199,12 +198,6 @@ class SubmissionsController < ApplicationController
           end
         stream = @testrun[:status] == :ok ? :stdout : :stderr
         send_and_store client_socket, {cmd: :write, stream:, data: "#{exit_statement}\n"}
-        if exit_code == 137
-          send_and_store client_socket, {cmd: :status, status: :out_of_memory}
-          @testrun[:status] = :out_of_memory
-        end
-
-        # The client connection will be closed once the file listing finished.
       end
 
       runner_socket.on :files do |files|
@@ -213,30 +206,40 @@ class SubmissionsController < ApplicationController
           js_tree = FileTree.new(downloadable_files).to_js_tree
           send_and_store client_socket, {cmd: :files, data: js_tree}
         end
-
-        close_client_connection(client_socket)
       end
     end
     @testrun[:container_execution_time] = durations[:execution_duration]
     @testrun[:waiting_for_container_time] = durations[:waiting_duration]
   rescue Runner::Error::ExecutionTimeout => e
     send_and_store client_socket, {cmd: :status, status: :timeout}
-    close_client_connection(client_socket)
     Rails.logger.debug { "Running a submission timed out: #{e.message}" }
     @testrun[:status] ||= :timeout
     @testrun[:output] = "timeout: #{@testrun[:output]}"
     extract_durations(e)
+  rescue Runner::Error::OutOfMemory => e
+    send_and_store client_socket, {cmd: :status, status: :out_of_memory}
+    Rails.logger.debug { "Running a submission caused an out of memory error: #{e.message}" }
+    @testrun[:status] ||= :out_of_memory
+    @testrun[:exit_code] ||= 137
+    @testrun[:output] = "out_of_memory: #{@testrun[:output]}"
+    extract_durations(e)
+  rescue Runner::Error::RunnerInUse => e
+    send_and_store client_socket, {cmd: :status, status: :runner_in_use}
+    Rails.logger.debug { "Running a submission failed because the runner was already in use: #{e.message}" }
+    @testrun[:status] ||= :runner_in_use
+    @testrun[:output] = "runner_in_use: #{@testrun[:output]}"
+    extract_durations(e)
   rescue Runner::Error => e
     # Regardless of the specific error cause, we send a `container_depleted` status to the client.
     send_and_store client_socket, {cmd: :status, status: :container_depleted}
-    close_client_connection(client_socket)
     @testrun[:status] ||= :container_depleted
     Rails.logger.debug { "Runner error while running a submission: #{e.message}" }
+    Sentry.capture_exception(e)
     extract_durations(e)
   ensure
+    close_client_connection(client_socket)
     save_testrun_output 'run'
   end
-  # rubocop:enable Metrics/CyclomaticComplexity:
 
   def score
     client_socket = nil
@@ -253,18 +256,26 @@ class SubmissionsController < ApplicationController
     return true if disable_scoring
 
     # The score is stored separately, we can forward it to the client immediately
-    client_socket&.send_data(JSON.dump(@submission.calculate_score))
+    client_socket&.send_data(JSON.dump(@submission.calculate_score(current_user)))
     # To enable hints when scoring a submission, uncomment the next line:
     # send_hints(client_socket, StructuredError.where(submission: @submission))
-    kill_client_socket(client_socket)
+  rescue Runner::Error::RunnerInUse => e
+    extract_durations(e)
+    send_and_store client_socket, {cmd: :status, status: :runner_in_use}
+    Rails.logger.debug { "Scoring a submission failed because the runner was already in use: #{e.message}" }
+    @testrun[:passed] = false
+    @testrun[:status] ||= :runner_in_use
+    @testrun[:output] = "runner_in_use: #{@testrun[:output]}"
+    save_testrun_output 'assess'
   rescue Runner::Error => e
     extract_durations(e)
     send_and_store client_socket, {cmd: :status, status: :container_depleted}
-    kill_client_socket(client_socket)
     Rails.logger.debug { "Runner error while scoring submission #{@submission.id}: #{e.message}" }
+    Sentry.capture_exception(e)
     @testrun[:passed] = false
-  ensure
     save_testrun_output 'assess'
+  ensure
+    kill_client_socket(client_socket)
   end
 
   def create
@@ -289,16 +300,24 @@ class SubmissionsController < ApplicationController
     return true if @embed_options[:disable_run]
 
     # The score is stored separately, we can forward it to the client immediately
-    client_socket&.send_data(JSON.dump(@submission.test(@file)))
-    kill_client_socket(client_socket)
+    client_socket&.send_data(JSON.dump(@submission.test(@file, current_user)))
+  rescue Runner::Error::RunnerInUse => e
+    extract_durations(e)
+    send_and_store client_socket, {cmd: :status, status: :runner_in_use}
+    Rails.logger.debug { "Scoring a submission failed because the runner was already in use: #{e.message}" }
+    @testrun[:passed] = false
+    @testrun[:status] ||= :runner_in_use
+    @testrun[:output] = "runner_in_use: #{@testrun[:output]}"
+    save_testrun_output 'assess'
   rescue Runner::Error => e
     extract_durations(e)
     send_and_store client_socket, {cmd: :status, status: :container_depleted}
-    kill_client_socket(client_socket)
     Rails.logger.debug { "Runner error while testing submission #{@submission.id}: #{e.message}" }
+    Sentry.capture_exception(e)
     @testrun[:passed] = false
-  ensure
     save_testrun_output 'assess'
+  ensure
+    kill_client_socket(client_socket)
   end
 
   private
@@ -315,10 +334,15 @@ class SubmissionsController < ApplicationController
   end
 
   def kill_client_socket(client_socket)
+    # Do nothing if the socket is not passed, i.e., because the pipe broke
+    return unless client_socket
+
     # We don't want to store this (arbitrary) exit command and redirect it ourselves
     client_socket.send_data JSON.dump({cmd: :exit})
     client_socket.send_data nil, :close
-    client_socket.close
+    # We must not close the socket manually (with `client_socket.close`), as this would close it twice.
+    # When the socket is closed twice, nginx registers a `Connection reset by peer` error.
+    # Tubesock automatically closes the socket when the `hijack` block ends and otherwise ignores `Errno::ECONNRESET`.
   end
 
   def create_remote_evaluation_mapping
@@ -362,7 +386,7 @@ class SubmissionsController < ApplicationController
       #
       # Reloading the ErrorTemplate is necessary to allow preloading the ErrorTemplateAttributes.
       # However, this results in less (and faster) SQL queries than performing manual lookups.
-      ErrorTemplate.where(id: matching_error_templates).joins(:error_template_attributes).includes(:error_template_attributes).each do |template|
+      ErrorTemplate.where(id: matching_error_templates).joins(:error_template_attributes).includes(:error_template_attributes).find_each do |template|
         results << StructuredError.create_from_template(template, @testrun[:output], @submission)
       end
     end
@@ -399,6 +423,7 @@ class SubmissionsController < ApplicationController
       passed: @testrun[:passed],
       cause:,
       submission: @submission,
+      user: current_user,
       exit_code: @testrun[:exit_code], # might be nil, e.g., when the run did not finish
       status: @testrun[:status] || :failed,
       output: @testrun[:output].presence, # TODO: Remove duplicated saving of the output after creating TestrunMessages

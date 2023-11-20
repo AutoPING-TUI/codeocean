@@ -2,7 +2,7 @@
 
 require 'rails_helper'
 
-describe Runner do
+RSpec.describe Runner do
   let(:runner_id) { attributes_for(:runner)[:runner_id] }
   let(:strategy_class) { described_class.strategy_class }
   let(:strategy) { instance_double(strategy_class) }
@@ -22,9 +22,9 @@ describe Runner do
       expect(runner.errors[:execution_environment]).to be_present
     end
 
-    it 'validates the presence of a user' do
-      runner.update(user: nil)
-      expect(runner.errors[:user]).to be_present
+    it 'validates the presence of a contributor' do
+      runner.update(contributor: nil)
+      expect(runner.errors[:contributor]).to be_present
     end
   end
 
@@ -34,8 +34,6 @@ describe Runner do
       let(:runner_management_config) { {runner_management: {enabled: true, strategy:}} }
 
       before do
-        # Ensure to reset the memorized helper
-        described_class.instance_variable_set :@strategy_class, nil
         allow(CodeOcean::Config).to receive(:new).with(:code_ocean).and_return(codeocean_config)
         allow(codeocean_config).to receive(:read).and_return(runner_management_config)
       end
@@ -55,11 +53,10 @@ describe Runner do
   end
 
   describe '#destroy_at_management' do
-    let(:runner) { described_class.create }
+    let(:runner) { create(:runner) }
 
     before do
-      allow(strategy_class).to receive(:request_from_management).and_return(runner_id)
-      allow(strategy_class).to receive(:new).and_return(strategy)
+      allow(strategy_class).to receive_messages(request_from_management: runner_id, new: strategy)
     end
 
     it 'delegates to its strategy' do
@@ -69,14 +66,13 @@ describe Runner do
   end
 
   describe '#attach to execution' do
-    let(:runner) { described_class.create }
+    let(:runner) { create(:runner) }
     let(:command) { 'ls' }
     let(:event_loop) { instance_double(Runner::EventLoop) }
     let(:connection) { instance_double(Runner::Connection) }
 
     before do
-      allow(strategy_class).to receive(:request_from_management).and_return(runner_id)
-      allow(strategy_class).to receive(:new).and_return(strategy)
+      allow(strategy_class).to receive_messages(request_from_management: runner_id, new: strategy)
       allow(event_loop).to receive(:wait)
       allow(connection).to receive(:error).and_return(nil)
       allow(Runner::EventLoop).to receive(:new).and_return(event_loop)
@@ -127,11 +123,10 @@ describe Runner do
   end
 
   describe '#copy_files' do
-    let(:runner) { described_class.create }
+    let(:runner) { create(:runner) }
 
     before do
-      allow(strategy_class).to receive(:request_from_management).and_return(runner_id)
-      allow(strategy_class).to receive(:new).and_return(strategy)
+      allow(strategy_class).to receive_messages(request_from_management: runner_id, new: strategy)
     end
 
     it 'delegates to its strategy' do
@@ -164,9 +159,9 @@ describe Runner do
   end
 
   describe 'creation' do
-    let(:user) { create(:external_user) }
+    let(:contributor) { create(:external_user) }
     let(:execution_environment) { create(:ruby) }
-    let(:create_action) { -> { described_class.create(user:, execution_environment:) } }
+    let(:create_action) { -> { described_class.create(contributor:, execution_environment:) } }
 
     it 'requests a runner id from the runner management' do
       expect(strategy_class).to receive(:request_from_management)
@@ -189,7 +184,7 @@ describe Runner do
     it 'does not call the runner management again while a runner id is set' do
       expect(strategy_class).to receive(:request_from_management).and_return(runner_id).once
       runner = create_action.call
-      runner.update(user: create(:external_user))
+      runner.update(contributor: create(:external_user))
     end
   end
 
@@ -242,27 +237,27 @@ describe Runner do
   end
 
   describe '::for' do
-    let(:user) { create(:external_user) }
+    let(:contributor) { create(:external_user) }
     let(:exercise) { create(:fibonacci) }
 
     context 'when the runner could not be saved' do
       before { allow(strategy_class).to receive(:request_from_management).and_return(nil) }
 
       it 'raises an error' do
-        expect { described_class.for(user, exercise.execution_environment) }.to raise_error(Runner::Error::Unknown, /could not be saved/)
+        expect { described_class.for(contributor, exercise.execution_environment) }.to raise_error(Runner::Error::Unknown, /could not be saved/)
       end
     end
 
     context 'when a runner already exists' do
-      let!(:existing_runner) { create(:runner, user:, execution_environment: exercise.execution_environment) }
+      let!(:existing_runner) { create(:runner, contributor:, execution_environment: exercise.execution_environment) }
 
       it 'returns the existing runner' do
-        new_runner = described_class.for(user, exercise.execution_environment)
+        new_runner = described_class.for(contributor, exercise.execution_environment)
         expect(new_runner).to eq(existing_runner)
       end
 
       it 'sets the strategy' do
-        runner = described_class.for(user, exercise.execution_environment)
+        runner = described_class.for(contributor, exercise.execution_environment)
         expect(runner.strategy).to be_present
       end
     end
@@ -271,7 +266,7 @@ describe Runner do
       before { allow(strategy_class).to receive(:request_from_management).and_return(runner_id) }
 
       it 'returns a new runner' do
-        runner = described_class.for(user, exercise.execution_environment)
+        runner = described_class.for(contributor, exercise.execution_environment)
         expect(runner).to be_valid
       end
     end

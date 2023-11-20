@@ -2,7 +2,7 @@
 
 require 'rails_helper'
 
-describe ExercisesController do
+RSpec.describe ExercisesController do
   render_views
 
   let(:exercise) { create(:dummy) }
@@ -14,7 +14,7 @@ describe ExercisesController do
   end
 
   describe 'PUT #batch_update' do
-    let(:attributes) { {public: 'true'} }
+    let(:attributes) { ActionController::Parameters.new(public: 'true').permit! }
     let(:perform_request) { proc { put :batch_update, params: {exercises: {0 => attributes.merge(id: exercise.id)}} } }
 
     before { perform_request.call }
@@ -164,7 +164,7 @@ describe ExercisesController do
       expect_assigns(exercise: :exercise)
 
       context 'with an existing submission' do
-        let!(:submission) { create(:submission, exercise_id: exercise.id, user_id: user.id, user_type: user.class.name) }
+        let!(:submission) { create(:submission, exercise:, contributor: user) }
 
         it "populates the editors with the submission's files' content" do
           perform_request.call
@@ -260,18 +260,18 @@ describe ExercisesController do
     let(:external_user) { create(:external_user) }
 
     before do
-      2.times { create(:submission, cause: 'autosave', user: external_user, exercise:) }
-      2.times { create(:submission, cause: 'run', user: external_user, exercise:) }
-      create(:submission, cause: 'assess', user: external_user, exercise:)
+      create_list(:submission, 2, cause: 'autosave', contributor: external_user, exercise:)
+      create_list(:submission, 2, cause: 'run', contributor: external_user, exercise:)
+      create(:submission, cause: 'assess', contributor: external_user, exercise:)
     end
 
     context 'when viewing the default submission statistics page without a parameter' do
       it 'does not list autosaved submissions' do
         perform_request
         expect(assigns(:all_events).filter {|event| event.is_a? Submission }).to contain_exactly(
-          an_object_having_attributes(cause: 'run', user_id: external_user.id),
-          an_object_having_attributes(cause: 'assess', user_id: external_user.id),
-          an_object_having_attributes(cause: 'run', user_id: external_user.id)
+          an_object_having_attributes(cause: 'run', contributor: external_user),
+          an_object_having_attributes(cause: 'assess', contributor: external_user),
+          an_object_having_attributes(cause: 'run', contributor: external_user)
         )
       end
     end
@@ -283,7 +283,7 @@ describe ExercisesController do
         perform_request
         submissions = assigns(:all_events).filter {|event| event.is_a? Submission }
         expect(submissions).to match_array Submission.all
-        expect(submissions).to include an_object_having_attributes(cause: 'autosave', user_id: external_user.id)
+        expect(submissions).to include an_object_having_attributes(cause: 'autosave', contributor: external_user)
       end
     end
   end
@@ -291,7 +291,7 @@ describe ExercisesController do
   describe 'POST #submit' do
     let(:output) { {} }
     let(:perform_request) { post :submit, format: :json, params: {id: exercise.id, submission: {cause: 'submit', exercise_id: exercise.id}} }
-    let(:user) { create(:external_user) }
+    let(:contributor) { create(:external_user) }
     let(:scoring_response) do
       [{
         status: :ok,
@@ -312,10 +312,9 @@ describe ExercisesController do
     end
 
     before do
-      create(:lti_parameter, external_user: user, exercise:)
-      submission = build(:submission, exercise:, user:)
-      allow(submission).to receive(:normalized_score).and_return(1)
-      allow(submission).to receive(:calculate_score).and_return(scoring_response)
+      create(:lti_parameter, external_user: contributor, exercise:)
+      submission = build(:submission, exercise:, contributor:)
+      allow(submission).to receive_messages(normalized_score: 1, calculate_score: scoring_response, redirect_to_feedback?: false)
       allow(Submission).to receive(:create).and_return(submission)
     end
 
@@ -326,7 +325,7 @@ describe ExercisesController do
 
       context 'when the score transmission succeeds' do
         before do
-          allow(controller).to receive(:send_score).and_return(status: 'success')
+          allow(controller).to receive(:send_scores).and_return([{status: 'success'}])
           perform_request
         end
 
@@ -342,7 +341,7 @@ describe ExercisesController do
 
       context 'when the score transmission fails' do
         before do
-          allow(controller).to receive(:send_score).and_return(status: 'unsupported')
+          allow(controller).to receive(:send_scores).and_return([{status: 'unsupported'}])
           perform_request
         end
 
@@ -352,8 +351,11 @@ describe ExercisesController do
           expect(assigns(:submission)).to be_a(Submission)
         end
 
+        it 'returns an error message' do
+          expect(response.parsed_body).to eq('danger' => I18n.t('exercises.submit.failure'))
+        end
+
         expect_json
-        expect_http_status(:service_unavailable)
       end
     end
 
@@ -370,7 +372,7 @@ describe ExercisesController do
       end
 
       it 'does not send scores' do
-        expect(controller).not_to receive(:send_score)
+        expect(controller).not_to receive(:send_scores)
       end
 
       expect_json
@@ -564,7 +566,7 @@ describe ExercisesController do
     end
 
     context 'when import fails with ProformaError' do
-      before { allow(ProformaService::Import).to receive(:call).and_raise(Proforma::PreImportValidationError) }
+      before { allow(ProformaService::Import).to receive(:call).and_raise(ProformaXML::PreImportValidationError) }
 
       it 'responds with correct status code' do
         post_request
@@ -573,7 +575,7 @@ describe ExercisesController do
     end
 
     context 'when import fails with ExerciseNotOwned' do
-      before { allow(ProformaService::Import).to receive(:call).and_raise(Proforma::ExerciseNotOwned) }
+      before { allow(ProformaService::Import).to receive(:call).and_raise(ProformaXML::ExerciseNotOwned) }
 
       it 'responds with correct status code' do
         post_request

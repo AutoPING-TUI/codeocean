@@ -2,7 +2,7 @@
 
 require 'rails_helper'
 
-describe Runner::Strategy::Poseidon do
+RSpec.describe Runner::Strategy::Poseidon do
   let(:runner_id) { attributes_for(:runner)[:runner_id] }
   let(:execution_environment) { create(:ruby) }
   let(:poseidon) { described_class.new(runner_id, execution_environment) }
@@ -13,8 +13,6 @@ describe Runner::Strategy::Poseidon do
   let(:runner_management_config) { {runner_management: {enabled: true, strategy: :poseidon, url: 'https://runners.example.org', unused_runner_expiration_time: 180}} }
 
   before do
-    # Ensure to reset the memorized helper
-    Runner.instance_variable_set :@strategy_class, nil
     allow(CodeOcean::Config).to receive(:new).with(:code_ocean).and_return(codeocean_config)
     allow(codeocean_config).to receive(:read).and_return(runner_management_config)
   end

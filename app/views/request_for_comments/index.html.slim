@@ -3,9 +3,10 @@ h1 = RequestForComment.model_name.human(count: 2)
 = render(layout: 'shared/form_filters') do |f|
   .col-md-9.col
     .row.align-items-center
-      .col-auto
-        = f.label(:exercise_title_cont, t('activerecord.attributes.request_for_comments.exercise'), class: 'visually-hidden form-label')
-        = f.search_field(:exercise_title_cont, class: 'form-control', placeholder: t('activerecord.attributes.request_for_comments.exercise'))
+      - if params[:exercise_id].nil?
+        .col-auto
+          = f.label(:exercise_title_cont, t('activerecord.attributes.request_for_comments.exercise'), class: 'visually-hidden form-label')
+          = f.search_field(:exercise_title_cont, class: 'form-control', placeholder: t('activerecord.attributes.request_for_comments.exercise'))
       .col-auto.mt-3.mt-md-0
         = f.label(:title_cont,  t('request_for_comments.solved'), class: 'visually-hidden form-label')
         = f.select(:solved_not_eq,  [[t('request_for_comments.show_all'), 2], [t('request_for_comments.show_unsolved'), 1], [t('request_for_comments.show_solved'), 0]])
@@ -22,7 +23,7 @@ h1 = RequestForComment.model_name.human(count: 2)
       tr
         th
           i class="fa-regular fa-lightbulb" aria-hidden="true" title = t('request_for_comments.solved') align="right"
-        th =  sort_link(@search, :title,  t('activerecord.attributes.request_for_comments.exercise'))
+        th.sorttable_nosort =  sort_link(@search, :title,  t('activerecord.attributes.request_for_comments.exercise'))
         th = t('activerecord.attributes.request_for_comments.question')
         th
           i class="fa-solid fa-comment" aria-hidden="true" title = t('request_for_comments.comments') align="center"
@@ -37,7 +38,7 @@ h1 = RequestForComment.model_name.human(count: 2)
               span class="fa-solid fa-check" aria-hidden="true"
           - elsif request_for_comment.full_score_reached
             td
-              span class="fa-solid fa-check" style="color:darkgrey" aria-hidden="true"
+              span class="fa-solid fa-check" style="color: var(--bs-secondary-text-emphasis);" aria-hidden="true"
           - else
             td = ''
           td = link_to_if(policy(request_for_comment).show?, request_for_comment.submission.exercise.title, request_for_comment)
@@ -45,7 +46,7 @@ h1 = RequestForComment.model_name.human(count: 2)
             td = truncate(request_for_comment.question, length: 200)
           - else
             td = '-'
-          td = request_for_comment.comments_count
+          td = request_for_comment.comments.size
           td = link_to_if(request_for_comment.user && policy(request_for_comment.user).show?, request_for_comment.user.displayname, request_for_comment.user)
           td = t('shared.time.before', time: distance_of_time_in_words_to_now(request_for_comment.created_at))
           td = t('shared.time.before', time: distance_of_time_in_words_to_now(request_for_comment.last_comment.nil? ? request_for_comment.updated_at : request_for_comment.last_comment))

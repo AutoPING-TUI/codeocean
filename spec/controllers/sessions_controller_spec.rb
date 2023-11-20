@@ -2,14 +2,14 @@
 
 require 'rails_helper'
 
-describe SessionsController do
+RSpec.describe SessionsController do
   render_views
 
   let(:consumer) { create(:consumer) }
 
   describe 'POST #create' do
     let(:password) { attributes_for(:teacher)[:password] }
-    let(:user) { InternalUser.create(user_attributes.merge(password:)) }
+    let(:user) { InternalUser.create(user_attributes.merge(password:, consumer:)) }
     let(:user_attributes) { build(:teacher).attributes }
 
     context 'with valid credentials' do
@@ -76,7 +76,7 @@ describe SessionsController do
     context 'with valid launch parameters' do
       let(:locale) { :de }
       let(:perform_request) { post :create_through_lti, params: {custom_locale: locale, custom_token: exercise.token, oauth_consumer_key: consumer.oauth_key, oauth_nonce: nonce, oauth_signature: SecureRandom.hex, user_id: user.external_id} }
-      let(:user) { create(:external_user, consumer_id: consumer.id) }
+      let(:user) { create(:external_user, consumer:) }
 
       before { allow_any_instance_of(IMS::LTI::ToolProvider).to receive(:valid_request?).and_return(true) }
 
@@ -101,7 +101,6 @@ describe SessionsController do
       end
 
       it 'stores LTI parameters in the session' do
-        # Todo replace session with lti_parameter /should be done already
         expect(controller).to receive(:store_lti_session_data)
         perform_request
       end
@@ -191,8 +190,11 @@ describe SessionsController do
       end
 
       it 'clears the session' do
-        # Todo replace session with lti_parameter /should be done already
-        expect(controller).to receive(:clear_lti_session_data)
+        expect(controller.session).to receive(:delete).with(:external_user_id)
+        expect(controller.session).to receive(:delete).with(:study_group_id)
+        expect(controller.session).to receive(:delete).with(:embed_options)
+        expect(controller.session).to receive(:delete).with(:pg_id)
+        expect(controller.session).to receive(:delete).with(:pair_programming)
         delete :destroy
       end
 
@@ -207,16 +209,8 @@ describe SessionsController do
     let(:submission) { create(:submission, exercise: create(:dummy)) }
 
     before do
-      # Todo replace session with lti_parameter
-      # Todo create LtiParameter Object
-      # session[:lti_parameters] = {}
-      allow(controller).to receive(:current_user).and_return(submission.user)
-      perform_request.call
-    end
-
-    it 'clears the session' do
-      # Todo replace session with lti_parameter /should be done already
-      expect(controller).to receive(:clear_lti_session_data)
+      create(:lti_parameter, external_user: submission.contributor)
+      allow(controller).to receive(:current_user).and_return(submission.contributor)
       perform_request.call
     end
 
@@ -227,9 +221,8 @@ describe SessionsController do
   describe 'GET #new' do
     context 'when no user is logged in' do
       before do
-        allow(controller).to receive(:set_sentry_context).and_return(nil)
+        allow(controller).to receive_messages(set_sentry_context: nil, current_user: nil)
 
-        allow(controller).to receive(:current_user).and_return(nil)
         get :new
       end
 
@@ -239,9 +232,8 @@ describe SessionsController do
 
     context 'when a user is already logged in' do
       before do
-        allow(controller).to receive(:set_sentry_context).and_return(nil)
+        allow(controller).to receive_messages(set_sentry_context: nil, current_user: build(:teacher))
 
-        allow(controller).to receive(:current_user).and_return(build(:teacher))
         get :new
       end
 

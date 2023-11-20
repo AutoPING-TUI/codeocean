@@ -2,13 +2,14 @@
 
 require 'rails_helper'
 
-describe InternalUsersController do
+RSpec.describe InternalUsersController do
   render_views
 
-  let(:user) { create(:admin) }
+  let(:consumer) { create(:consumer) }
+  let(:user) { create(:admin, consumer:) }
 
   describe 'GET #activate' do
-    let(:user) { InternalUser.create(attributes_for(:teacher)) }
+    let(:user) { InternalUser.create(attributes_for(:teacher).merge(consumer:)) }
 
     before do
       user.send(:setup_activation)
@@ -40,7 +41,7 @@ describe InternalUsersController do
   end
 
   describe 'PUT #activate' do
-    let(:user) { InternalUser.create(build(:teacher).attributes) }
+    let(:user) { InternalUser.create(build(:teacher, consumer:).attributes) }
     let(:password) { SecureRandom.hex }
 
     before do
@@ -145,8 +146,8 @@ describe InternalUsersController do
   end
 
   describe 'DELETE #destroy' do
-    let(:second_user) { create(:teacher) }
-    let(:third_user) { create(:teacher) }
+    let(:second_user) { create(:teacher, consumer:) }
+    let(:third_user) { create(:teacher, consumer:) }
 
     before do
       allow(controller).to receive(:current_user).and_return(user)
@@ -178,9 +179,8 @@ describe InternalUsersController do
   describe 'GET #forgot_password' do
     context 'when no user is logged in' do
       before do
-        allow(controller).to receive(:set_sentry_context).and_return(nil)
+        allow(controller).to receive_messages(set_sentry_context: nil, current_user: nil)
 
-        allow(controller).to receive(:current_user).and_return(nil)
         get :forgot_password
       end
 
@@ -190,9 +190,8 @@ describe InternalUsersController do
 
     context 'when a user is already logged in' do
       before do
-        allow(controller).to receive(:set_sentry_context).and_return(nil)
+        allow(controller).to receive_messages(set_sentry_context: nil, current_user: user)
 
-        allow(controller).to receive(:current_user).and_return(user)
         get :forgot_password
       end
 

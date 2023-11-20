@@ -17,7 +17,7 @@ module FileParameters
         # avoid that public files from other contexts can be created
         # `next` is similar to an early return and will proceed with the next iteration of the loop
         next true if file.context_type == 'Exercise' && file.context_id != exercise.id
-        next true if file.context_type == 'Submission' && (file.context.user_id != current_user.id || file.context.user_type != current_user.class.name)
+        next true if file.context_type == 'Submission' && (file.context.contributor_id != current_contributor.id || file.context.contributor_type != current_contributor.class.name)
         next true if file.context_type == 'CommunitySolution' && controller_name != 'community_solutions'
 
         # Optimization: We already queried the ancestor file, let's reuse the object.
@@ -34,7 +34,7 @@ module FileParameters
 
   def file_attributes
     %w[content context_id feedback_message file_id file_type_id hidden id name native_file path read_only role weight
-       file_template_id]
+       file_template_id hidden_feedback]
   end
   private :file_attributes
 end

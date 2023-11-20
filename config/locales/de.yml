@@ -45,10 +45,11 @@ de:
         maximum_score: Erreichbare Punktzahl
         submission_deadline: Abgabefrist
         late_submission_deadline: Verspätete Abgabefrist
-        number_of_users: "# Nutzer"
+        number_of_users_and_programming_groups: "# Nutzer und Programmiergruppen"
         public: Öffentlich
         selection: Ausgewählt
         title: Titel
+        internal_title: Alternativer Titel
         user: Autor
         allow_auto_completion: "Autovervollständigung aktivieren"
         allow_file_creation: "Dateierstellung erlauben"
@@ -56,6 +57,16 @@ de:
         token: "Aufgaben-Token"
         uuid: UUID
         unpublished: Deaktiviert
+      programming_group:
+        exercise: Aufgabe
+        external_user_id: Externe Nutzer-ID
+        internal_user_id: Interne Nutzer-ID
+        member: Mitglieder
+        member_count: Anzahl der Mitglieder
+        name: Name
+        programming_partner_ids: Nutzer-ID der Programmierpartnerin / des Programmierpartners
+      programming_group/programming_group_memberships:
+        base: Programmiergruppenmitgliedschaft
       proxy_exercise:
         title: Title
         files_count: Anzahl der Aufgaben
@@ -75,6 +86,7 @@ de:
         file_type: Dateityp
         file_type_id: Dateityp
         hidden: Versteckt
+        hidden_feedback: Feedback ausblenden
         name: Name
         path: Pfad
         read_only: Schreibgeschützt
@@ -118,10 +130,10 @@ de:
       submission:
         cause: Anlass
         code: Code
+        contributor: Mitwirkende:r
         exercise: Aufgabe
         files: Dateien
         score: Punktzahl
-        user: Autor
         study_group: Lerngruppe
       study_group:
         name: Name
@@ -171,7 +183,7 @@ de:
         exercises: "Aufgaben"
         solutions: "Gesamtanzahl Lösungsversuche"
         submissions: "Gesamtanzahl Submissions"
-        users: "Teilnehmer"
+        users_and_programming_groups: "Teilnehmer und Programmiergruppen"
       user_exercise_feedback:
         user: "Autor"
         exercise: "Aufgabe"
@@ -224,6 +236,12 @@ de:
       internal_user:
         one: Interner Nutzer
         other: Interne Nutzer
+      programming_group:
+        one: Programmierpaar
+        other: Programmierpaare
+      programming_group_membership:
+        one: Programmiergruppenmitgliedschaft
+        other: Programmiergruppenmitgliedschaften
       request_for_comment:
         one: Kommentaranfrage
         other: Kommentaranfragen
@@ -258,6 +276,12 @@ de:
           attributes:
             password:
               weak: ist zu schwach. Versuchen Sie es mit einem  langen Passwort, welches Groß-, Kleinbuchstaben, Zahlen und Sonderzeichen enthält.
+        programming_group:
+          size_too_large: Die Größe dieser Programmiergruppe ist zu groß. Geben Sie nur eine andere Nutzer-ID an.
+          size_too_small: Die Größe dieser Programmiergruppe ist zu klein. Geben Sie eine andere Nutzer-ID an.
+          invalid_partner_id: Die Nutzer-ID '%{partner_id}' ist ungültig und wurde entfernt. Bitte überprüfen Sie die Nutzer-IDs der Programmierpartner.
+        programming_group_membership:
+          already_exists: 'existiert bereits für diese Aufgabe für den Nutzer mit der ID %{id_with_type}.'
   admin:
     dashboard:
       show:
@@ -345,7 +369,7 @@ de:
         permission_denied: Der Zugriff auf die angeforderte Datei wurde verweigert. Bitte überprüfen Sie, dass die Datei existiert, der aktuelle Benutzer Leseberechtigungen besitzt und versuchen Sie ggf. die Datei mit "root"-Rechten anzufordern. Dazu müssen Sie den "sudo"-Schalter neben der Befehlszeile aktivieren und anschließend das Dateisystem vor dem Herunterladen einer Datei aktualisieren.
     statistics:
       exercise: Übung
-      users: Anzahl (externer) Nutzer
+      users_and_programming_groups: Anzahl Nutzer und Programmiergruppen
       score: Durchschnittliche Punktzahl
       stddev_score: stdabw (Punktzahl)
       stddev_worktime: stdabw (Arbeitszeit)
@@ -368,10 +392,13 @@ de:
       expand_action_sidebar: Aktions-Leiste Ausklappen
       expand_output_sidebar: Ausgabe-Leiste Ausklappen
       input: Ihre Eingabe
+      is_offline: "%{name} ist offline"
+      is_online: "%{name} ist online"
       lastsaved: 'Zuletzt gespeichert: '
       network: 'Während Ihr Code läuft, ist Port %{port} unter folgender Adresse erreichbar: <a href="%{address}" target="_blank" rel="noopener">%{address}</a>.'
       render: Anzeigen
       run: Ausführen
+      runner_in_use: Sie führen momentan Code aus. Bitte stoppen Sie die vorherige Ausführung oder warten Sie einen Moment, bevor Sie fortfahren.
       run_failure: Ihr Code konnte nicht auf der Plattform ausgeführt werden.
       run_success: Ihr Code wurde auf der Plattform ausgeführt.
       requestComments: Kommentare erbitten
@@ -381,6 +408,7 @@ de:
       send: Senden
       start_over: Diese Aufgabe zurücksetzen
       start_over_active_file: Diese Datei zurücksetzen
+      start_video: (Video-) Chat starten
       stop: Stoppen
       submit: Code zur Bewertung abgeben
       deadline: Deadline
@@ -440,6 +468,7 @@ de:
       no_execution_environment_selected: Bitte eine Ausführungsumgebung auswählen, bevor die Aufgabe aktiviert wird.
       none: Keine
       hints:
+        internal_title: Ein alternativer Titel für diese Aufgabe, der nur für Lehrende sichtbar ist.
         submission_deadline: Ein Zeitpunkt in UTC, zu dem die Abgabe geschlossen wird. Abgaben nach der Abgabefrist werden als verspätet gekennzeichnet und nur mit 20% Punktabzug an die E-Learning-Plattform übertragen.
         late_submission_deadline: Eine Gnadenfrist für Abgaben in UTC. Die verlängerte Abgabefrist soll nicht vor der eigentlichen Abgabefrist liegen. Abgaben nach der Abgabefrist werden deutlich gekennzeichnet und mit 100% Punktabzug an die E-Learning-Plattform übertragen.
     implement:
@@ -449,6 +478,8 @@ de:
       default_test_feedback: Sehr gut. Alle Tests waren erfolgreich.
       default_linter_feedback: Sehr gut. Der Linter hat nichts mehr zu beanstanden.
       error_messages: Fehlermeldungen
+      existing_programming_group: Sie arbeiten gerade an der Übung mit dem Titel '%{exercise}' als Teil einer Programmiergruppe. Bitte schließen Sie Ihre Arbeit dort ab, indem Sie Ihren Code bewerten und abgeben, bevor Sie mit der Bearbeitung dieser Übung beginnen.
+      external_privacy_policy: Datenschutzerklärung
       messages: Meldungen
       feedback: Feedback
       test_file: 'Test-Datei <span class="number">%{number}</span> (<span class="filename">%{filename}</span>)'
@@ -458,7 +489,7 @@ de:
       no_files: Die Aufgabe umfasst noch keine sichtbaren Dateien.
       no_execution_environment: Für die Aufgabe wurde noch keine Ausführungsumgebung gewählt.
       no_output: Die letzte Code-Ausführung terminierte am %{timestamp} ohne Ausgabe.
-      no_output_exit_successful: Die letzte Code-Ausführung terminierte am %{timestamp} ohne Ausgabe and wurde erfolgreich beendet (Statuscode %{exit_code}).
+      no_output_exit_successful: Die letzte Code-Ausführung terminierte am %{timestamp} ohne Ausgabe und wurde erfolgreich beendet (Statuscode %{exit_code}).
       no_output_exit_failure: Die letzte Code-Ausführung terminierte am %{timestamp} ohne Ausgabe und wurde mit einem Fehler beendet (Statuscode %{exit_code}).
       exit_successful: Die letzte Code-Ausführung wurde erfolgreich beendet (Statuscode %{exit_code}).
       exit_failure: Die letzte Code-Ausführung wurde mit einem Fehler beendet (Statuscode %{exit_code}).
@@ -479,7 +510,7 @@ de:
         others: Andere Kommentare auf dieser Zeile
         addCommentExercise: Aufgabe kommentieren
         addyours: Fügen Sie Ihren Kommentar hinzu
-        addComment: Hier haben Sie die Möglichkeit Ihr Feedback zu dieser Aufgabe zu geben. Dies bezieht sich ausdrücklich NICHT auf die hier sichtbare Lösung des Teilnehmers, sondern nur auf die Aufgabe. Fanden Sie die Aufgabe zu leicht oder schwer? War die Beschreibung der Aufgabe verständlich und vollständig?
+        addComment: Hier haben Sie die Möglichkeit, Feedback zu dieser Aufgabe zu geben. Dies bezieht sich ausdrücklich NICHT auf die hier sichtbare Lösung des Teilnehmers, sondern nur auf die Aufgabe. Fanden Sie die Aufgabe zu leicht oder schwer? War die Beschreibung der Aufgabe verständlich und vollständig?
         addCommentButton: Kommentar abschicken
         removeAllOnLine: Meine Kommentare auf dieser Zeile löschen
         listing: Die neuesten Kommentaranfragen
@@ -518,7 +549,7 @@ de:
       final_submissions: Finale Abgaben
       intermediate_submissions: Intermediäre Abgaben
       participants: Bearbeitende Nutzer
-      users: '%{count} verschiedene Nutzer'
+      users_and_programming_groups: '%{count} verschiedene Nutzer und Programmiergruppen'
       user: Nutzer
       score: Maximale Punktzahl
       deadline: Abgabefrist
@@ -527,12 +558,14 @@ de:
       average_worktime: Durchschnittliche Arbeitszeit
       internal_users: Interne Nutzer
       external_users: Externe Nutzer
+      programming_groups: Programmiergruppen
       finishing_rate: Abschlussrate
     submit:
       failure: Beim Übermitteln Ihrer Punktzahl ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut.
       too_late: Ihre Abgabe wurde erfolgreich gespeichert, ging jedoch nach der Abgabefrist ein.
       full_score_redirect_to_rfc: Herzlichen Glückwunsch! Sie haben die maximale Punktzahl für diese Aufgabe an den Kurs übertragen. Ein anderer Teilnehmer hat eine Frage zu der von Ihnen gelösten Aufgabe. Er würde sich sicherlich sehr über ihre Hilfe und Kommentare freuen.
       full_score_redirect_to_own_rfc: Herzlichen Glückwunsch! Sie haben die maximale Punktzahl für diese Aufgabe an den Kurs übertragen. Ihre Frage ist damit wahrscheinlich gelöst? Falls ja, fügen Sie doch den entscheidenden Kniff als Antwort hinzu und markieren die Frage als gelöst, bevor sie das Fenster schließen.
+      warning_not_for_all_users_submitted: "Die Punkteübertragung war nur teilweise erfolgreich. Die Punkte konnten nicht für %{user} übertragen werden. Diese Person(en) sollte die Aufgabe über die e-Learning Platform erneut öffnen und anschließend die Punkte selbst übermitteln."
     study_group_dashboard:
       live_dashboard: Live Dashboard
       time_spent_per_learner: Verwendete Zeit pro Lerner
@@ -562,6 +595,28 @@ de:
   proxy_exercises:
       index:
         clone: Duplizieren
+  programming_groups:
+    form:
+      hints:
+        programming_partner_ids: "Sie können mehrere Nutzer-IDs mit Kommata getrennt eingeben, wie z.B.: 'e123, e234'."
+    new:
+      close: Schließen
+      create_programming_pair: Programmierpaar erstellen
+      dont_show_modal_again: "Auf diesem Gerät nicht mehr anzeigen"
+      enter_partner_id: "Kennen Sie eine Person in dem Kurs, mit der Sie gemeinsam die Aufgabe lösen möchten? Dann geben Sie hier die Nutzer-ID dieser Person ein."
+      find_partner_title: "Eine:n Programmierpartner:in für die Aufgabe finden"
+      find_partner_description: "Wenn Sie keine Person aus dem Kurs kennen, haben Sie die Möglichkeit mit einer anderen Person gepaart zu werden. Sie werden dann zur Aufgabe weitergeleitet, sobald eine andere Person ebenfalls diese Aufgabe im Team lösen möchte."
+      find_programming_partner: Programmierpartner:in finden
+      info_pair_programming: "Pair Programming (Programmieren in Paaren) ist eine Methode, bei der zwei Personen gemeinsam programmieren. Dabei übernehmen sie <i>abwechselnd</i> zwei verschiedene Rollen:  Den <i>Driver</i>, der den Code schreibt und sich auf die Details fokussiert und den <i>Navigator</i>, der Tippfehler korrigiert, die Aufgabenstellung im Blick behält und Verbesserungsideen vorschlägt. Kommunikation miteinander ist von entscheidender Bedeutung für erfolgreiches Pair Programming."
+      info_forced_work_together: "Sie können die Aufgabe '%{exercise_title}' nur gemeinsam mit einer anderen Person lösen. Ihr:e Teampartner:in kann sehen, was Sie in dieser Aufgabe schreiben und umgekehrt. Für das Lösen der Aufgabe erhalten Sie Bonuspunkte."
+      info_work_together: "Sie haben die Möglichkeit, die Aufgabe '%{exercise_title}' zusammen mit einer anderen Person zu lösen. Ihr:e Teampartner:in kann sehen, was Sie in dieser Aufgabe schreiben und umgekehrt. Beachten Sie dabei, dass anschließend keiner die Zusammenarbeit beenden kann. Für die nächste Aufgabe können Sie sich erneuert entscheiden, ob und mit wem Sie zusammen arbeiten möchten."
+      own_user_id: "Ihre Nutzer-ID:"
+      pair_programming_info: Pair Programming Info
+      work_alone: "Alleine arbeiten"
+      work_alone_description: "Sie können sich einmalig dafür entscheiden, die Aufgabe alleine zu bearbeiten. Anschließend können Sie jedoch nicht mehr in die Partnerarbeit für diese Aufgabe wechseln. <br> <a href=%{path} data-turbolinks=\"false\">Klicken Sie hier, um die Aufgabe im Einzelmodus zu starten.</a>"
+      work_with_a_friend: "Mit einem/einer Freund:in zusammenarbeiten"
+    implement:
+      info_disconnected: Ihre Verbindung zum Server wurde unterbrochen. Bitte überprüfen Sie Ihre Internetverbindung und laden Sie die Seite erneut.
   external_users:
     statistics:
       title: Statistiken für Externe Benutzer
@@ -616,8 +671,6 @@ de:
     form:
       study_groups: Lerngruppen
       click_to_collapse: Zum Aus-/Einklappen hier klicken...
-  search:
-    search_in_forum: "Probleme? Suche hier im Forum"
   locales:
     de: Deutsch
     en: Englisch
@@ -818,7 +871,7 @@ de:
     runtime_output: "Programmausgabe"
     test_results: "Testergebnisse"
   sessions:
-    expired: Ihre Session ist abgelaufen. Bitte <a href="" class="reloadCurrentPage">laden Sie diese Seite neu</a> bevor Sie fortfahren.
+    expired: Ihre Session ist abgelaufen. Bitte <a href="" class="reloadCurrentPage alert-link">laden Sie diese Seite neu</a> bevor Sie fortfahren.
     create:
       failure: Fehlerhafte E-Mail oder Passwort.
       success: Sie haben sich erfolgreich angemeldet.
@@ -860,6 +913,11 @@ de:
     confirm_destroy: Sind Sie sicher?
     create: '%{model} erstellen'
     created_at: Erstellt
+    color_mode:
+      title: Erscheinungsbild
+      light: Hell
+      dark: Dunkel
+      auto: Automatisch
     destroy: Löschen
     edit: Bearbeiten
     actions_button: 'Andere Aktionen'
@@ -874,7 +932,7 @@ de:
       privacy_policy: Datenschutzerklärung
     index: Index
     message_failure: Leider ist ein Fehler auf unserer Plattform aufgetreten. Bitte probieren Sie es später noch einmal.
-    websocket_failure: Leider ist ein Verbindungsproblem aufgetreten. <a href="https://websocketstest.com" target="_blank" rel="noopener">Bitte überprüfen Sie Websocket-Verbindungen mit diesem Tool</a> und versuchen Sie es erneut.
+    websocket_failure: Leider ist ein Verbindungsproblem aufgetreten. <a href="https://websocketstest.com" target="_blank" rel="noopener" class="alert-link">Bitte überprüfen Sie Websocket-Verbindungen mit diesem Tool</a> und versuchen Sie es erneut.
     new: Hinzufügen
     new_model: '%{model} hinzufügen'
     number: Nummer
@@ -905,6 +963,9 @@ de:
       download: Download
       file: Benutzerdefinierte Datei
       render: Anzeige
+      remoteAssess: Remote Bewertung
+      remoteSubmit: Remote Abgabe
+      requestComments: Kommentaranfrage
       run: Ausführung
       save: Speichern
       submit: Abgabe
@@ -960,7 +1021,7 @@ de:
     subscription_not_existent: "Das Abonnement, von dem Sie sich abmelden wollen, existiert nicht."
   statistics:
     sections:
-      users: "Benutzer"
+      contributors: "Mitwirkende"
       exercises: "Aufgaben"
       request_for_comments: "Kommentaranfragen"
     entries:
@@ -990,10 +1051,11 @@ de:
       update: "Aktualisieren"
   navigation:
     sections:
+      contributors: "Mitwirkende"
       errors: "Fehler"
       files: "Dateien"
-      users: "Benutzer"
       integrations: "Integrationen"
+      users: "Nutzer"
   exercise_collections:
     form:
       add_exercises: "Aufgaben hinzufügen"

@@ -2,7 +2,9 @@
 
 source 'https://rubygems.org'
 
+gem 'actioncable-enhanced-postgresql-adapter'
 gem 'bcrypt'
+gem 'bootsnap', require: false
 gem 'bootstrap-will_paginate'
 gem 'carrierwave'
 gem 'charlock_holmes', require: 'charlock_holmes/string'
@@ -30,19 +32,19 @@ gem 'net-smtp', require: false
 gem 'nokogiri'
 gem 'pagedown-bootstrap-rails'
 gem 'pg'
-gem 'proforma', github: 'openHPI/proforma', tag: 'v0.7.1'
+gem 'proformaxml', '~> 1.2.0'
 gem 'prometheus_exporter'
 gem 'puma'
 gem 'pundit'
-gem 'rails', '~> 7.0.4'
-gem 'rails_admin', '< 4.0.0'
+gem 'rails', '~> 7.1.0'
+gem 'rails_admin'
 gem 'rails-i18n'
 gem 'rails-timeago'
 gem 'ransack'
 gem 'rubytree'
 gem 'rubyzip'
-gem 'sass-rails'
-gem 'shakapacker', '6.6.0'
+gem 'sassc-rails'
+gem 'shakapacker', '7.2.0.rc.0'
 gem 'slim-rails'
 gem 'sorcery'
 gem 'sprockets-rails'
@@ -66,7 +68,6 @@ end
 group :development, :staging do
   gem 'better_errors'
   gem 'binding_of_caller'
-  gem 'bootsnap', require: false
   gem 'letter_opener'
   gem 'listen'
   gem 'pry-byebug'
@@ -83,7 +84,6 @@ group :test do
   gem 'capybara'
   gem 'database_cleaner'
   gem 'headless'
-  gem 'nyan-cat-formatter'
   gem 'rails-controller-testing'
   gem 'rspec-collection_matchers'
   gem 'rspec-github', require: false

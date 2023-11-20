@@ -32,7 +32,7 @@ CodeOceanEditorTurtle = {
     this.showCanvas();
     for (var i = 0; i < msg.batch.length; i++) {
       var cmd = msg.batch[i];
-      this.turtlescreen[cmd[0]].apply(this.turtlescreen, cmd[1]);
+      this.turtlescreen[cmd[0]]?.apply(this.turtlescreen, cmd[1]);
     }
   },
 
@@ -45,7 +45,7 @@ CodeOceanEditorTurtle = {
 
   hideCanvas: function () {
     const turtlediv = $('#turtlediv');
-    if (turtlediv.isPresent() && !turtlediv.hasClass('d-none')) {
+    if (turtlediv && turtlediv.isPresent() && !turtlediv.hasClass('d-none')) {
       turtlediv.addClass('d-none');
     }
   }

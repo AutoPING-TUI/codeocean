@@ -34,9 +34,10 @@ class RemoteEvaluationController < ApplicationController
   end
 
   def try_lti
-    if !@submission.user.nil? && lti_outcome_service?(@submission.exercise_id, @submission.user.id)
-      lti_response = send_score(@submission)
-      process_lti_response(lti_response)
+    # TODO: Need to consider and support programming groups
+    if !@submission.user.nil? && lti_outcome_service?(@submission.exercise, @submission.user, @submission.study_group_id)
+      lti_responses = send_scores(@submission)
+      process_lti_response(lti_responses.first)
     else
       {
         message: "Your submission was successfully scored with #{@submission.normalized_score * 100}%. " \
@@ -65,12 +66,15 @@ class RemoteEvaluationController < ApplicationController
     validation_token = remote_evaluation_params[:validation_token]
     if (remote_evaluation_mapping = RemoteEvaluationMapping.find_by(validation_token:))
       @submission = Submission.create(build_submission_params(cause, remote_evaluation_mapping))
-      @submission.calculate_score
+      @submission.calculate_score(remote_evaluation_mapping.user)
     else
       # TODO: better output
       # TODO: check token expired?
       {message: 'No exercise found for this validation_token! Please keep out!', status: 401}
     end
+  rescue Runner::Error::RunnerInUse => e
+    Rails.logger.debug { "Scoring a submission failed because the runner was already in use: #{e.message}" }
+    {message: I18n.t('exercises.editor.runner_in_use'), status: 409}
   rescue Runner::Error => e
     Rails.logger.debug { "Runner error while scoring submission #{@submission.id}: #{e.message}" }
     {message: I18n.t('exercises.editor.depleted'), status: 503}

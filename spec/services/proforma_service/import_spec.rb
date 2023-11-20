@@ -2,7 +2,7 @@
 
 require 'rails_helper'
 
-describe ProformaService::Import do
+RSpec.describe ProformaService::Import do
   describe '.new' do
     subject(:import_service) { described_class.new(zip:, user:) }
 
@@ -160,7 +160,7 @@ describe ProformaService::Import do
         let(:import_user) { create(:teacher) }
 
         it 'raises a proforma error' do
-          expect { imported_exercise.save! }.to raise_error Proforma::ExerciseNotOwned
+          expect { imported_exercise.save! }.to raise_error ProformaXML::ExerciseNotOwned
         end
       end
     end

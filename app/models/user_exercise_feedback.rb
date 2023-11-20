@@ -13,11 +13,13 @@ class UserExerciseFeedback < ApplicationRecord
   scope :final, -> { where(normalized_score: 1.00) }
 
   def to_s
-    'User Exercise Feedback'
+    "User Exercise Feedback #{id}"
   end
 
   def anomaly_notification
-    AnomalyNotification.where({exercise_id: exercise.id, user_id:, user_type:})
-      .where('created_at < ?', created_at).order('created_at DESC').to_a.first
+    AnomalyNotification
+      .where(exercise:, contributor: user, created_at: ...created_at)
+      .order(created_at: :desc)
+      .first
   end
 end

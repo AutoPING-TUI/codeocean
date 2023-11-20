@@ -3,7 +3,7 @@ CodeOceanEditorSubmissions = {
 
   AUTOSAVE_INTERVAL: 15 * 1000,
   autosaveTimer: null,
-  autosaveLabel: "#statusbar span",
+  autosaveLabel: "#statusbar #autosave",
 
   /**
    * Submission-Creation
@@ -112,28 +112,38 @@ CodeOceanEditorSubmissions = {
   },
 
   resetCode: function(initiator, onlyActiveFile = false) {
+    this.startSentryTransaction(initiator);
     this.showSpinner(initiator);
     this.ajax({
       method: 'GET',
       url: $('#start-over').data('url') || $('#start-over-active-file').data('url')
     }).done(function(response) {
       this.hideSpinner();
-      _.each(this.editors, function(editor) {
-        var file_id = $(editor.container).data('file-id');
-        var file = _.find(response.files, function(file) {
-          return file.id === file_id;
-        });
-        if(file && !onlyActiveFile || file && file.id === CodeOceanEditor.active_file.id){
-            editor.setValue(file.content);
-        }
-      }.bind(this));
+      App.synchronized_editor?.reset_content(response);
+      this.setEditorContent(response, onlyActiveFile);
+    }.bind(this));
+  },
+
+  setEditorContent: function(new_content, onlyActiveFile = false) {
+    _.each(this.editors, function(editor) {
+      const editor_file_id = $(editor.container).data('file-id');
+      const found_file = _.find(new_content.files, function(file) {
+        // File.id is used to reload the exercise and file.file_id is used to update the editor content for pair programming group members
+        return (file.id || file.file_id) === editor_file_id;
+      });
+      if(found_file && !onlyActiveFile || found_file && found_file.id === CodeOceanEditor.active_file.id){
+        editor.setValue(found_file.content);
+        editor.clearSelection();
+      }
     }.bind(this));
   },
 
   renderCode: function(event) {
+    const cause = $('#render');
+    this.startSentryTransaction(cause);
     event.preventDefault();
     if ($('#render').is(':visible')) {
-      this.createSubmission('#render', null, function (response) {
+      this.createSubmission(cause, null, function (response) {
         if (response.render_url === undefined) return;
 
         const active_file = CodeOceanEditor.active_file.filename.replace(/#$/,''); // remove # if it is the last character, this is not part of the filename and just an anchor
@@ -162,10 +172,12 @@ CodeOceanEditorSubmissions = {
    * Execution-Logic
    */
   runCode: function(event) {
+    const cause = $('#run');
+    this.startSentryTransaction(cause);
     event.preventDefault();
     this.stopCode(event);
     if ($('#run').is(':visible')) {
-      this.createSubmission('#run', null, this.runSubmission.bind(this));
+      this.createSubmission(cause, null, this.runSubmission.bind(this));
     }
   },
 
@@ -179,19 +191,12 @@ CodeOceanEditorSubmissions = {
     this.initializeSocketForRunning(url);
   },
 
-  saveCode: function(event) {
-    event.preventDefault();
-    this.createSubmission('#save', null, function() {
-      $.flash.success({
-        text: $('#save').data('message-success')
-      });
-    });
-  },
-
   testCode: function(event) {
+    const cause = $('#test');
+    this.startSentryTransaction(cause);
     event.preventDefault();
     if ($('#test').is(':visible')) {
-      this.createSubmission('#test', null, function(response) {
+      this.createSubmission(cause, null, function(response) {
         this.showSpinner($('#test'));
         $('#score_div').addClass('d-none');
         var url = response.test_url.replace(this.FILENAME_URL_PLACEHOLDER, CodeOceanEditor.active_file.filename.replace(/#$/,'')); // remove # if it is the last character, this is not part of the filename and just an anchor
@@ -202,22 +207,28 @@ CodeOceanEditorSubmissions = {
 
   submitCode: function(event) {
     const button = $(event.target) || $('#submit');
+    this.startSentryTransaction(button);
     this.teardownEventHandlers();
     this.createSubmission(button, null, function (response) {
       if (response.redirect) {
+        App.synchronized_editor?.disconnect();
         this.autosaveIfChanged();
         this.stopCode(event);
         this.editors = [];
         Turbolinks.clearCache();
         Turbolinks.visit(response.redirect);
       } else if (response.status === 'container_depleted') {
-          this.showContainerDepletedMessage();
-      } else if (response.message) {
-          $.flash.danger({
-              text: response.message
-          });
+        this.initializeEventHandlers();
+        this.showContainerDepletedMessage();
+      } else {
+        this.initializeEventHandlers();
+        for (let [type, text] of Object.entries(response)) {
+          $.flash[type]({
+            text: text,
+            showPermanent: true // We might display a very long text message!
+          })
+        }
       }
-      this.initializeEventHandlers();
     })
   },
 

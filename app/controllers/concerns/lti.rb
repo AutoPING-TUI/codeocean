@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'oauth/request_proxy/rack_request'
+require 'oauth/request_proxy/action_controller_request'
 
 module Lti
   extend ActiveSupport::Concern
@@ -9,6 +9,7 @@ module Lti
   MAXIMUM_SCORE = 1
   MAXIMUM_SESSION_AGE = 60.minutes
   SESSION_PARAMETERS = %w[launch_presentation_return_url lis_outcome_service_url lis_result_sourcedid].freeze
+  ERROR_STATUS = %w[error unsupported].freeze
 
   def build_tool_provider(options = {})
     if options[:consumer] && options[:parameters]
@@ -17,25 +18,6 @@ module Lti
   end
 
   private :build_tool_provider
-
-  # exercise_id.nil? ==> the user has logged out. All session data is to be destroyed
-  # exercise_id.exists? ==> the user has submitted the results of an exercise to the consumer.
-  # Only the lti_parameters are deleted.
-  def clear_lti_session_data(exercise_id = nil, _user_id = nil)
-    if exercise_id.nil?
-      session.delete(:external_user_id)
-      session.delete(:study_group_id)
-      session.delete(:embed_options)
-      session.delete(:lti_exercise_id)
-      session.delete(:lti_parameters_id)
-    end
-
-    # March 2022: We temporarily allow reusing the LTI credentials and don't remove them on purpose.
-    # This allows users to jump between remote and web evaluation with the same behavior.
-    # LtiParameter.where(external_users_id: user_id, exercises_id: exercise_id).destroy_all
-  end
-
-  private :clear_lti_session_data
 
   def consumer_return_url(provider, options = {})
     consumer_return_url = provider.try(:launch_presentation_return_url) || params[:launch_presentation_return_url]
@@ -110,7 +92,6 @@ module Lti
                 else
                   proxy_exercise.get_matching_exercise(current_user)
                 end
-    session[:lti_exercise_id] = @exercise.id if @exercise
     refuse_lti_launch(message: t('sessions.oauth.invalid_exercise_token')) unless @exercise
   end
 
@@ -137,21 +118,24 @@ module Lti
 
   private :return_to_consumer
 
-  def send_score(submission)
+  def send_scores(submission)
     unless (0..MAXIMUM_SCORE).cover?(submission.normalized_score)
       raise Error.new("Score #{submission.normalized_score} must be between 0 and #{MAXIMUM_SCORE}!")
     end
 
-    if submission.user.consumer
-      lti_parameter = LtiParameter.where(consumers_id: submission.user.consumer.id,
-        external_users_id: submission.user_id,
-        exercises_id: submission.exercise_id).last
+    submission.users.map {|user| send_score_for submission, user }
+  end
 
-      provider = build_tool_provider(consumer: submission.user.consumer, parameters: lti_parameter.lti_parameters)
+  private :send_scores
+
+  def send_score_for(submission, user)
+    if user.external_user? && user.consumer
+      lti_parameter = user.lti_parameters.find_by(exercise: submission.exercise, study_group: submission.study_group)
+      provider = build_tool_provider(consumer: user.consumer, parameters: lti_parameter&.lti_parameters)
     end
 
     if provider.nil?
-      {status: 'error'}
+      {status: 'error', user: user.displayname}
     elsif provider.outcome_service?
       Sentry.set_extras({
         provider: provider.inspect,
@@ -160,30 +144,30 @@ module Lti
         session: session.to_hash,
         exercise_id: submission.exercise_id,
       })
-      normalized_lit_score = submission.normalized_score
+      normalized_lti_score = submission.normalized_score
       if submission.before_deadline?
         # Keep the full score
       elsif submission.within_grace_period?
         # Reduce score by 20%
-        normalized_lit_score *= 0.8
+        normalized_lti_score *= 0.8
       elsif submission.after_late_deadline?
         # Reduce score by 100%
-        normalized_lit_score *= 0.0
+        normalized_lti_score *= 0.0
       end
 
       begin
-        response = provider.post_replace_result!(normalized_lit_score)
-        {code: response.response_code, message: response.post_response.body, status: response.code_major, score_sent: normalized_lit_score}
-      rescue IMS::LTI::XMLParseError, Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNRESET
+        response = provider.post_replace_result!(normalized_lti_score)
+        {code: response.response_code, message: response.post_response.body, status: response.code_major, score_sent: normalized_lti_score, user: user.displayname}
+      rescue IMS::LTI::XMLParseError, Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNRESET, SocketError, EOFError
         # A parsing error might happen if the LTI provider is down and doesn't return a valid XML response
-        {status: 'error'}
+        {status: 'error', user: user.displayname}
       end
     else
-      {status: 'unsupported'}
+      {status: 'unsupported', user: user.displayname}
     end
   end
 
-  private :send_score
+  private :send_score_for
 
   def set_current_user
     @current_user = ExternalUser.find_or_create_by(consumer_id: @consumer.id, external_id: @provider.user_id)
@@ -205,6 +189,7 @@ module Lti
     study_group_membership = StudyGroupMembership.find_or_create_by(study_group: group, user: current_user)
     study_group_membership.update(role: external_user_role(@provider))
     session[:study_group_id] = group.id
+    current_user.store_current_study_group_id(group.id)
   end
 
   def set_embedding_options
@@ -232,17 +217,18 @@ module Lti
 
   private :set_embedding_options
 
-  def store_lti_session_data(options = {})
-    lti_parameters = LtiParameter.find_or_create_by(consumers_id: options[:consumer].id,
-      external_users_id: current_user.id,
-      exercises_id: @exercise.id)
+  def store_lti_session_data(parameters)
+    @lti_parameters = LtiParameter.find_or_initialize_by(external_user: current_user,
+      study_group_id: session[:study_group_id],
+      exercise: @exercise)
 
-    lti_parameters.lti_parameters = options[:parameters].slice(*SESSION_PARAMETERS).permit!.to_h
-    lti_parameters.save!
-    @lti_parameters = lti_parameters
+    @lti_parameters.lti_parameters = parameters.slice(*SESSION_PARAMETERS).permit!.to_h
+    @lti_parameters.save!
 
     session[:external_user_id] = current_user.id
-    session[:lti_parameters_id] = lti_parameters.id
+    session[:pair_programming] = parameters[:custom_pair_programming] || false
+  rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
+    retry
   end
 
   private :store_lti_session_data

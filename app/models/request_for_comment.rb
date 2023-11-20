@@ -22,10 +22,6 @@ class RequestForComment < ApplicationRecord
 
   # after_save :trigger_rfc_action_cable
 
-  def comments_count
-    submission.files.sum {|file| file.comments.size }
-  end
-
   def commenters
     comments.map(&:user).uniq
   end
@@ -44,6 +40,10 @@ class RequestForComment < ApplicationRecord
 
   def old_state
     state(solved_before_last_save, full_score_reached_before_last_save)
+  end
+
+  def self.parent_resource
+    Exercise
   end
 
   private

@@ -10,23 +10,23 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2023_03_20_220012) do
+ActiveRecord::Schema[7.1].define(version: 2023_10_29_172331) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_trgm"
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
 
   create_table "anomaly_notifications", id: :serial, force: :cascade do |t|
-    t.integer "user_id"
-    t.string "user_type"
-    t.integer "exercise_id"
-    t.integer "exercise_collection_id"
-    t.string "reason"
+    t.integer "contributor_id", null: false
+    t.string "contributor_type", null: false
+    t.integer "exercise_id", null: false
+    t.integer "exercise_collection_id", null: false
+    t.jsonb "reason"
     t.datetime "created_at"
     t.datetime "updated_at"
+    t.index ["contributor_type", "contributor_id"], name: "index_anomaly_notifications_on_contributor"
     t.index ["exercise_collection_id"], name: "index_anomaly_notifications_on_exercise_collection_id"
     t.index ["exercise_id"], name: "index_anomaly_notifications_on_exercise_id"
-    t.index ["user_type", "user_id"], name: "index_anomaly_notifications_on_user"
   end
 
   create_table "authentication_tokens", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -143,6 +143,34 @@ ActiveRecord::Schema[7.0].define(version: 2023_03_20_220012) do
     t.integer "file_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "programming_group_id"
+    t.bigint "study_group_id"
+    t.index ["programming_group_id"], name: "index_events_on_programming_group_id"
+    t.index ["study_group_id"], name: "index_events_on_study_group_id"
+  end
+
+  create_table "events_synchronized_editor", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.bigint "programming_group_id", null: false
+    t.bigint "study_group_id", null: false
+    t.string "user_type", null: false
+    t.bigint "user_id", null: false
+    t.integer "action", limit: 2, default: 0, null: false, comment: "Used as enum in Rails"
+    t.integer "status", limit: 2, comment: "Used as enum in Rails"
+    t.bigint "file_id"
+    t.integer "editor_action", limit: 2, comment: "Used as enum in Rails"
+    t.integer "range_start_row"
+    t.integer "range_start_column"
+    t.integer "range_end_row"
+    t.integer "range_end_column"
+    t.text "lines", array: true
+    t.jsonb "data"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "session_id", null: false
+    t.index ["file_id"], name: "index_events_synchronized_editor_on_file_id"
+    t.index ["programming_group_id"], name: "index_events_synchronized_editor_on_programming_group_id"
+    t.index ["study_group_id"], name: "index_events_synchronized_editor_on_study_group_id"
+    t.index ["user_type", "user_id"], name: "index_events_synchronized_editor_on_user"
   end
 
   create_table "execution_environments", id: :serial, force: :cascade do |t|
@@ -220,8 +248,10 @@ ActiveRecord::Schema[7.0].define(version: 2023_03_20_220012) do
     t.boolean "unpublished", default: false
     t.datetime "submission_deadline"
     t.datetime "late_submission_deadline"
+    t.string "internal_title"
     t.index ["id"], name: "index_exercises_on_id"
     t.index ["id"], name: "index_unpublished_exercises", where: "(NOT unpublished)"
+    t.index ["internal_title"], name: "index_exercises_on_internal_title", opclass: :gin_trgm_ops, using: :gin
     t.index ["title"], name: "index_exercises_on_title", opclass: :gin_trgm_ops, using: :gin
   end
 
@@ -284,6 +314,7 @@ ActiveRecord::Schema[7.0].define(version: 2023_03_20_220012) do
     t.float "weight"
     t.string "path"
     t.integer "file_template_id"
+    t.boolean "hidden_feedback", default: false, null: false
     t.index ["context_id", "context_type"], name: "index_files_on_context_id_and_context_type"
   end
 
@@ -340,14 +371,66 @@ ActiveRecord::Schema[7.0].define(version: 2023_03_20_220012) do
     t.string "severity"
   end
 
-  create_table "lti_parameters", id: :serial, force: :cascade do |t|
-    t.integer "external_users_id"
-    t.integer "consumers_id"
-    t.integer "exercises_id"
+  create_table "lti_parameters", force: :cascade do |t|
+    t.integer "external_user_id", null: false
+    t.integer "exercise_id", null: false
     t.jsonb "lti_parameters", default: {}, null: false
     t.datetime "created_at"
     t.datetime "updated_at"
-    t.index ["external_users_id"], name: "index_lti_parameters_on_external_users_id"
+    t.bigint "study_group_id"
+    t.index ["external_user_id", "study_group_id", "exercise_id"], name: "index_lti_params_on_external_user_and_study_group_and_exercise", unique: true
+    t.index ["external_user_id"], name: "index_lti_parameters_on_external_user_id"
+    t.index ["study_group_id"], name: "index_lti_parameters_on_study_group_id"
+  end
+
+  create_table "pair_programming_exercise_feedbacks", force: :cascade do |t|
+    t.bigint "exercise_id", null: false
+    t.bigint "submission_id", null: false
+    t.string "user_type", null: false
+    t.bigint "user_id", null: false
+    t.bigint "programming_group_id"
+    t.bigint "study_group_id", null: false
+    t.integer "difficulty"
+    t.integer "user_estimated_worktime"
+    t.integer "reason_work_alone"
+    t.float "normalized_score"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["exercise_id"], name: "index_pair_programming_exercise_feedbacks_on_exercise_id"
+    t.index ["programming_group_id"], name: "pp_feedback_programming_group"
+    t.index ["study_group_id"], name: "index_pair_programming_exercise_feedbacks_on_study_group_id"
+    t.index ["submission_id"], name: "index_pair_programming_exercise_feedbacks_on_submission_id"
+    t.index ["user_type", "user_id"], name: "index_pair_programming_exercise_feedbacks_on_user"
+  end
+
+  create_table "pair_programming_waiting_users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "user_type", null: false
+    t.bigint "user_id", null: false
+    t.bigint "exercise_id", null: false
+    t.bigint "programming_group_id"
+    t.integer "status", limit: 2, null: false, comment: "Used as enum in Rails"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["exercise_id"], name: "index_pair_programming_waiting_users_on_exercise_id"
+    t.index ["programming_group_id"], name: "index_pair_programming_waiting_users_on_programming_group_id"
+    t.index ["user_type", "user_id"], name: "index_pair_programming_waiting_users_on_user"
+  end
+
+  create_table "programming_group_memberships", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.bigint "programming_group_id", null: false
+    t.string "user_type", null: false
+    t.bigint "user_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["programming_group_id"], name: "index_programming_group_memberships_on_programming_group_id"
+    t.index ["user_type", "user_id"], name: "index_programming_group_memberships_on_user"
+  end
+
+  create_table "programming_groups", force: :cascade do |t|
+    t.bigint "exercise_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["exercise_id"], name: "index_programming_groups_on_exercise_id"
   end
 
   create_table "proxy_exercises", id: :serial, force: :cascade do |t|
@@ -396,12 +479,13 @@ ActiveRecord::Schema[7.0].define(version: 2023_03_20_220012) do
   create_table "runners", force: :cascade do |t|
     t.string "runner_id"
     t.bigint "execution_environment_id"
-    t.string "user_type"
-    t.bigint "user_id"
+    t.string "contributor_type"
+    t.bigint "contributor_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.datetime "reserved_until"
+    t.index ["contributor_type", "contributor_id"], name: "index_runners_on_user"
     t.index ["execution_environment_id"], name: "index_runners_on_execution_environment_id"
-    t.index ["user_type", "user_id"], name: "index_runners_on_user"
   end
 
   create_table "searches", id: :serial, force: :cascade do |t|
@@ -453,15 +537,15 @@ ActiveRecord::Schema[7.0].define(version: 2023_03_20_220012) do
   create_table "submissions", id: :serial, force: :cascade do |t|
     t.integer "exercise_id"
     t.float "score"
-    t.integer "user_id"
+    t.integer "contributor_id", null: false
     t.datetime "created_at"
     t.datetime "updated_at"
     t.string "cause"
-    t.string "user_type"
+    t.string "contributor_type", null: false
     t.bigint "study_group_id"
+    t.index ["contributor_id"], name: "index_submissions_on_contributor_id"
     t.index ["exercise_id"], name: "index_submissions_on_exercise_id"
     t.index ["study_group_id"], name: "index_submissions_on_study_group_id"
-    t.index ["user_id"], name: "index_submissions_on_user_id"
   end
 
   create_table "subscriptions", id: :serial, force: :cascade do |t|
@@ -508,7 +592,7 @@ ActiveRecord::Schema[7.0].define(version: 2023_03_20_220012) do
     t.boolean "passed"
     t.text "output"
     t.integer "file_id"
-    t.integer "submission_id"
+    t.integer "submission_id", null: false
     t.datetime "created_at"
     t.datetime "updated_at"
     t.string "cause"
@@ -516,7 +600,10 @@ ActiveRecord::Schema[7.0].define(version: 2023_03_20_220012) do
     t.interval "waiting_for_container_time"
     t.integer "exit_code", limit: 2, comment: "No exit code is available in case of a timeout"
     t.integer "status", limit: 2, default: 0, null: false, comment: "Used as enum in Rails"
+    t.string "user_type", null: false
+    t.bigint "user_id", null: false
     t.index ["submission_id"], name: "index_testruns_on_submission_id"
+    t.index ["user_type", "user_id"], name: "index_testruns_on_user"
     t.check_constraint "exit_code >= 0 AND exit_code <= 255", name: "exit_code_constraint"
   end
 
@@ -572,45 +659,44 @@ ActiveRecord::Schema[7.0].define(version: 2023_03_20_220012) do
     t.index ["user_type", "user_id"], name: "index_user_proxy_exercise_exercises_on_user"
   end
 
-  create_table "wk2020_until_rfc_reply", id: false, force: :cascade do |t|
-    t.integer "user_id"
-    t.integer "exercise_id"
-    t.interval "working_time_until_rfc_reply"
-  end
-
-  create_table "wk2020_with_wk_until_rfc", id: false, force: :cascade do |t|
-    t.string "external_user_id", limit: 255
-    t.integer "user_id"
-    t.integer "exercise_id"
-    t.float "max_score"
-    t.float "max_reachable_points"
-    t.interval "working_time"
-    t.interval "working_time_until_rfc"
-    t.interval "working_time_until_rfc_reply"
-    t.time "percentile75"
-    t.time "percentile90"
-  end
-
+  add_foreign_key "anomaly_notifications", "exercise_collections"
+  add_foreign_key "anomaly_notifications", "exercises"
   add_foreign_key "authentication_tokens", "study_groups"
   add_foreign_key "community_solution_contributions", "community_solution_locks"
   add_foreign_key "community_solution_contributions", "community_solutions"
   add_foreign_key "community_solution_contributions", "study_groups"
   add_foreign_key "community_solution_locks", "community_solutions"
   add_foreign_key "community_solutions", "exercises"
+  add_foreign_key "events", "programming_groups"
+  add_foreign_key "events", "study_groups"
+  add_foreign_key "events_synchronized_editor", "files"
+  add_foreign_key "events_synchronized_editor", "programming_groups"
+  add_foreign_key "events_synchronized_editor", "study_groups"
   add_foreign_key "exercise_tips", "exercise_tips", column: "parent_exercise_tip_id"
   add_foreign_key "exercise_tips", "exercises"
   add_foreign_key "exercise_tips", "tips"
+  add_foreign_key "lti_parameters", "exercises"
+  add_foreign_key "lti_parameters", "external_users"
+  add_foreign_key "lti_parameters", "study_groups"
+  add_foreign_key "pair_programming_exercise_feedbacks", "exercises"
+  add_foreign_key "pair_programming_exercise_feedbacks", "programming_groups"
+  add_foreign_key "pair_programming_exercise_feedbacks", "study_groups"
+  add_foreign_key "pair_programming_exercise_feedbacks", "submissions"
+  add_foreign_key "pair_programming_waiting_users", "exercises"
+  add_foreign_key "pair_programming_waiting_users", "programming_groups"
+  add_foreign_key "programming_group_memberships", "programming_groups"
+  add_foreign_key "programming_groups", "exercises"
   add_foreign_key "remote_evaluation_mappings", "study_groups"
   add_foreign_key "structured_error_attributes", "error_template_attributes"
   add_foreign_key "structured_error_attributes", "structured_errors"
   add_foreign_key "structured_errors", "error_templates"
-  add_foreign_key "structured_errors", "error_templates", name: "structured_errors_error_templates_id_fk"
   add_foreign_key "structured_errors", "submissions"
   add_foreign_key "submissions", "study_groups"
   add_foreign_key "subscriptions", "study_groups"
   add_foreign_key "testrun_execution_environments", "execution_environments"
   add_foreign_key "testrun_execution_environments", "testruns"
   add_foreign_key "testrun_messages", "testruns"
+  add_foreign_key "testruns", "submissions"
   add_foreign_key "tips", "file_types"
   add_foreign_key "user_exercise_feedbacks", "submissions"
 end

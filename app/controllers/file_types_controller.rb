@@ -12,7 +12,7 @@ class FileTypesController < ApplicationController
   private :authorize!
 
   def index
-    @file_types = FileType.all.includes(:user).order(:name).paginate(page: params[:page], per_page: per_page_param)
+    @file_types = FileType.includes(:user).order(:name).paginate(page: params[:page], per_page: per_page_param)
     authorize!
   end
 
@@ -25,9 +25,7 @@ class FileTypesController < ApplicationController
 
   def file_type_params
     if params[:file_type].present?
-      params[:file_type].permit(:binary, :editor_mode, :executable, :file_extension, :name, :indent_size, :renderable).merge(
-        user_id: current_user.id, user_type: current_user.class.name
-      )
+      params[:file_type].permit(:binary, :editor_mode, :executable, :file_extension, :name, :indent_size, :renderable).merge(user: current_user)
     end
   end
   private :file_type_params

@@ -8,6 +8,10 @@ class StudyGroup < ApplicationRecord
   has_many :remote_evaluation_mappings, dependent: :nullify
   has_many :subscriptions, dependent: :nullify
   has_many :authentication_tokens, dependent: :nullify
+  has_many :lti_parameters, dependent: :delete_all
+  has_many :events
+  has_many :events_synchronized_editor, class_name: 'Event::SynchronizedEditor'
+  has_many :pair_programming_exercise_feedbacks
   belongs_to :consumer
 
   def users
@@ -15,7 +19,7 @@ class StudyGroup < ApplicationRecord
   end
 
   def user_count
-    study_group_memberships.distinct.count
+    attributes['user_count'] || study_group_memberships.size
   end
 
   def to_s

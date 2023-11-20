@@ -2,13 +2,16 @@
 
 require 'rails_helper'
 
-describe 'exercises/implement.html.slim' do
+RSpec.describe 'exercises/implement.html.slim' do
   let(:exercise) { create(:fibonacci) }
   let(:files) { exercise.files.visible }
   let(:non_binary_files) { files.reject {|file| file.file_type.binary? } }
+  let(:user) { create(:admin) }
 
   before do
-    allow(view).to receive(:current_user).and_return(create(:admin))
+    without_partial_double_verification do
+      allow(view).to receive_messages(current_user: user, current_contributor: user)
+    end
     assign(:exercise, exercise)
     assign(:files, files)
     assign(:paths, [])

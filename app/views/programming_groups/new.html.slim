@@ -1,0 +1,41 @@
+h1.d-inline-block = t('programming_groups.new.create_programming_pair')
+.btn.btn-success.float-end data-bs-toggle= 'modal' data-bs-target= '#modal-info-pair-programming'
+  i.fa-solid.fa-circle-info
+  = t('programming_groups.new.pair_programming_info')
+#matching data-exercise-id=@exercise.id.to_s
+  .row
+    .col-12.mt-2.mb-4
+      - if session[:pair_programming] == 'mandatory'
+        p = t('programming_groups.new.info_forced_work_together', exercise_title: @exercise.title)
+      - else
+        p = t('programming_groups.new.info_work_together', exercise_title: @exercise.title)
+
+  .row
+    .col-md-6
+      h5 = t('programming_groups.new.work_with_a_friend')
+      p = t('programming_groups.new.enter_partner_id', exercise_title: @exercise.title)
+
+
+      => t('programming_groups.new.own_user_id')
+      b = current_user.id_with_type
+      .d-md-none
+        = render('form')
+
+    .col-md-6
+      h5 = t('programming_groups.new.find_partner_title')
+      p = t('programming_groups.new.find_partner_description')
+
+      .join_programming_pair.button.btn.btn-primary.d-md-none.mb-3
+        i.fa-solid.fa-circle-notch.fa-spin.d-none
+        = t('programming_groups.new.find_programming_partner')
+  .row
+    .col-12.d-none.d-md-block
+      = render('form')
+
+  - unless session[:pair_programming] == 'mandatory'
+    .row
+      .col-12
+        h5 = t('programming_groups.new.work_alone')
+        == t('programming_groups.new.work_alone_description', path: implement_exercise_path(@exercise))
+
+= render('shared/modal', classes: 'modal-lg', id: 'modal-info-pair-programming', template: 'programming_groups/_info_pair_programming', title: t('programming_groups.new.pair_programming_info'))

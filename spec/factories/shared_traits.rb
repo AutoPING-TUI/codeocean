@@ -3,12 +3,12 @@
 FactoryBot.define do
   %i[admin external_user teacher].each do |factory_name|
     trait :"created_by_#{factory_name}" do
-      association :user, factory: factory_name
+      user factory: factory_name
     end
   end
 
   trait :generated_email do
-    email { "#{name.underscore.tr(' ', '.')}@example.org" }
+    sequence(:email) {|n| "#{name.underscore.tr(' ', '.')}.#{n}@example.org" }
   end
 
   trait :generated_user_name do

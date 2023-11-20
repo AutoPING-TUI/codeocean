@@ -3,6 +3,7 @@
 class InternalUsersController < ApplicationController
   include CommonBehavior
 
+  before_action :require_user!, except: %i[activate forgot_password reset_password]
   before_action :require_activation_token, only: :activate
   before_action :require_reset_password_token, only: :reset_password
   before_action :set_user, only: MEMBER_ACTIONS
@@ -149,7 +150,7 @@ class InternalUsersController < ApplicationController
     @user ||= InternalUser.new # Only needed for the `create` action
     checked_study_group_memberships = @user.study_group_memberships
     checked_study_groups = checked_study_group_memberships.collect(&:study_group).sort.to_set
-    unchecked_study_groups = StudyGroup.all.order(name: :asc).to_set.subtract checked_study_groups
+    unchecked_study_groups = StudyGroup.order(name: :asc).to_set.subtract checked_study_groups
     @study_group_memberships = checked_study_group_memberships + unchecked_study_groups.collect do |study_group|
       StudyGroupMembership.new(user: @user, study_group:)
     end

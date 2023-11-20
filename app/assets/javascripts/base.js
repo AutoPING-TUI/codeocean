@@ -8,7 +8,7 @@ window.CodeOcean = {
   }
 };
 
-var ANIMATION_DURATION = 500;
+const ANIMATION_DURATION = 500;
 
 $.isController = function(name) {
   return $('div[data-controller="' + name + '"]').isPresent();
@@ -36,6 +36,10 @@ $(document).on('turbolinks:load', function() {
         window.location.reload();
     });
 
+    // Set current user and current contributor
+    window.current_user = JSON.parse($('meta[name="current-user"]')?.attr('content') || null);
+    window.current_contributor = JSON.parse($('meta[name="current-contributor"]')?.attr('content') || null);
+
     // Set locale for all JavaScript functions
     const htmlTag = $('html')
     I18n.defaultLocale = htmlTag.data('default-locale');
@@ -44,28 +48,25 @@ $(document).on('turbolinks:load', function() {
 
     // Initialize Sentry
     const sentrySettings = $('meta[name="sentry"]')
-    if (sentrySettings.data()['enabled']) {
-        // Workaround for Turbolinks: We must not re-initialize the Relay object when visiting another page
-        window.SentryReplay ||= new Sentry.Replay();
 
+    // Workaround for Turbolinks: We must not re-initialize the Relay object when visiting another page
+    if (sentrySettings && sentrySettings.data()['enabled'] && !Sentry.Replay.prototype._isInitialized) {
         Sentry.init({
             dsn: sentrySettings.data('dsn'),
             attachStacktrace: true,
             release: sentrySettings.data('release'),
             environment: sentrySettings.data('environment'),
-            autoSessionTracking: false,
+            autoSessionTracking: true,
+            tracesSampleRate: 1.0,
             replaysSessionSampleRate: 0.0,
             replaysOnErrorSampleRate: 1.0,
-            integrations: [
-                SentryReplay,
-            ],
-        });
-
-        Sentry.configureScope(function (scope) {
-            const user = $('meta[name="current-user"]').attr('content');
-
-            if (user) {
-                scope.setUser(JSON.parse(user));
+            integrations: window.SentryIntegrations(),
+            profilesSampleRate: 1.0,
+            initialScope: scope =>{
+                if (current_user) {
+                    scope.setUser(_.omit(current_user, 'displayname'));
+                }
+                return scope;
             }
         });
     }

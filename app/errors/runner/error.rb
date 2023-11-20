@@ -16,6 +16,8 @@ class Runner
 
     class Unauthorized < Error; end
 
+    class RunnerInUse < Error; end
+
     class RunnerNotFound < Error; end
 
     class FaradayError < Error; end
@@ -23,6 +25,8 @@ class Runner
     class UnexpectedResponse < Error; end
 
     class WorkspaceError < Error; end
+
+    class OutOfMemory < Error; end
 
     class Unknown < Error; end
   end

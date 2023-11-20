@@ -7,21 +7,23 @@ class StudyGroupsController < ApplicationController
 
   def index
     @search = policy_scope(StudyGroup).ransack(params[:q])
-    @study_groups = @search.result.includes(:consumer).order(:name).paginate(page: params[:page], per_page: per_page_param)
+    @study_groups_paginate = @search.result.includes(:consumer).order(:name).paginate(page: params[:page], per_page: per_page_param)
+    @study_groups = @study_groups_paginate.joins(:study_group_memberships)
+      .group(:id, :name, :external_id, :consumer_id, :created_at, :updated_at)
+      .select(:id, :name, :external_id, :consumer_id, :created_at, :updated_at, 'count(study_group_memberships.id) as user_count')
     authorize!
   end
 
   def show; end
 
   def edit
-    @members = StudyGroupMembership.where(user: @study_group.users, study_group: @study_group).includes(:user)
+    @members = @study_group.study_group_memberships.includes(:user)
   end
 
   def update
     myparams = study_group_params
-    myparams[:external_users] =
-      StudyGroupMembership.find(myparams[:study_group_membership_ids].compact_blank).map(&:user)
-    myparams.delete(:study_group_membership_ids)
+    @members = @study_group.study_group_memberships.includes(:user)
+    myparams[:external_users] = @members.where(id: myparams[:study_group_membership_ids].compact_blank).map(&:user)
     update_and_respond(object: @study_group, params: myparams)
   end
 
@@ -30,7 +32,7 @@ class StudyGroupsController < ApplicationController
   end
 
   def study_group_params
-    params[:study_group].permit(:id, :name, study_group_membership_ids: []) if params[:study_group].present?
+    params.require(:study_group).permit(:name, study_group_membership_ids: [])
   end
   private :study_group_params
 

@@ -1,11 +1,10 @@
 # frozen_string_literal: true
 
 class Runner < ApplicationRecord
+  include ContributorCreation
   belongs_to :execution_environment
-  belongs_to :user, polymorphic: true
 
   before_validation :request_id
-
   validates :runner_id, presence: true
 
   attr_accessor :strategy
@@ -30,10 +29,10 @@ class Runner < ApplicationRecord
     end
   end
 
-  def self.for(user, execution_environment)
-    runner = find_by(user:, execution_environment:)
+  def self.for(contributor, execution_environment)
+    runner = find_by(contributor:, execution_environment:)
     if runner.nil?
-      runner = Runner.create(user:, execution_environment:)
+      runner = Runner.create(contributor:, execution_environment:)
       # The `strategy` is added through the before_validation hook `:request_id`.
       raise Runner::Error::Unknown.new("Runner could not be saved: #{runner.errors.inspect}") unless runner.persisted?
     else
@@ -45,25 +44,31 @@ class Runner < ApplicationRecord
   end
 
   def copy_files(files)
+    reserve!
     @strategy.copy_files(files)
   rescue Runner::Error::RunnerNotFound
     request_new_id
     save
     @strategy.copy_files(files)
+  ensure
+    release!
   end
 
-  def download_file(path, **options, &)
-    @strategy.download_file(path, **options, &)
+  def download_file(desired_file, privileged_execution:, exclusive: true)
+    reserve! if exclusive
+    @strategy.download_file(desired_file, privileged_execution:)
+    release! if exclusive
   end
 
-  def retrieve_files(raise_exception: true, **options)
+  def retrieve_files(raise_exception: true, exclusive: true, **)
+    reserve! if exclusive
     try = 0
     begin
       if try.nonzero?
         request_new_id
         save
       end
-      @strategy.retrieve_files(**options)
+      @strategy.retrieve_files(**)
     rescue Runner::Error::RunnerNotFound => e
       Rails.logger.debug { "Retrieving files failed for the first time: #{e.message}" }
       try += 1
@@ -78,13 +83,15 @@ class Runner < ApplicationRecord
       # We forward the exception if requested
       raise e if raise_exception && defined?(e) && e.present?
 
-      # Otherwise, we return an hash with empty files
+      # Otherwise, we return an hash with empty files and release the runner
+      release! if exclusive
       {'files' => []}
     end
   end
 
-  def attach_to_execution(command, privileged_execution: false, &block)
-    Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Starting execution with Runner #{id} for #{user_type} #{user_id}." }
+  def attach_to_execution(command, privileged_execution: false, exclusive: true, &block)
+    reserve! if exclusive
+    Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Starting execution with Runner #{id} for #{contributor_type} #{contributor_id}." }
     starting_time = Time.zone.now
     begin
       # As the EventMachine reactor is probably shared with other threads, we cannot use EventMachine.run with
@@ -101,11 +108,12 @@ class Runner < ApplicationRecord
       e.execution_duration = Time.zone.now - starting_time
       raise
     end
-    Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Stopped execution with Runner #{id} for #{user_type} #{user_id}." }
+    release! if exclusive
+    Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Stopped execution with Runner #{id} for #{contributor_type} #{contributor_id}." }
     Time.zone.now - starting_time # execution duration
   end
 
-  def execute_command(command, privileged_execution: false, raise_exception: true)
+  def execute_command(command, privileged_execution: false, raise_exception: true, exclusive: true)
     output = {
       stdout: +'',
       stderr: +'',
@@ -120,7 +128,7 @@ class Runner < ApplicationRecord
         save
       end
 
-      execution_time = attach_to_execution(command, privileged_execution:) do |socket, starting_time|
+      execution_time = attach_to_execution(command, privileged_execution:, exclusive:) do |socket, starting_time|
         socket.on :stderr do |data|
           output[:stderr] << data
           output[:messages].push({cmd: :write, stream: :stderr, log: data, timestamp: Time.zone.now - starting_time})
@@ -137,6 +145,12 @@ class Runner < ApplicationRecord
     rescue Runner::Error::ExecutionTimeout => e
       Rails.logger.debug { "Running command `#{command}` timed out: #{e.message}" }
       output.merge!(status: :timeout, container_execution_time: e.execution_duration)
+    rescue Runner::Error::OutOfMemory => e
+      Rails.logger.debug { "Running command `#{command}` caused an out of memory error: #{e.message}" }
+      output.merge!(status: :out_of_memory, container_execution_time: e.execution_duration)
+    rescue Runner::Error::RunnerInUse => e
+      Rails.logger.debug { "Running command `#{command}` failed because the runner was already in use: #{e.message}" }
+      output.merge!(status: :runner_in_use, container_execution_time: e.execution_duration)
     rescue Runner::Error::RunnerNotFound => e
       Rails.logger.debug { "Running command `#{command}` failed for the first time: #{e.message}" }
       try += 1
@@ -164,6 +178,27 @@ class Runner < ApplicationRecord
 
   def destroy_at_management
     @strategy.destroy_at_management
+    update!(runner_id: nil, reserved_until: nil)
+  end
+
+  def reserve!
+    with_lock do
+      if reserved_until.present? && reserved_until > Time.zone.now
+        @error = Runner::Error::RunnerInUse.new("The desired Runner #{id} is already in use until #{reserved_until.iso8601}.")
+        raise @error
+      else
+        update!(reserved_until: Time.zone.now + execution_environment.permitted_execution_time.seconds)
+        @error = nil
+      end
+    end
+  end
+
+  def release!
+    return if @error.present?
+
+    with_lock do
+      update!(reserved_until: nil)
+    end
   end
 
   private

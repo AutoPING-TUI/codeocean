@@ -2,7 +2,7 @@
 
 class Submission < ApplicationRecord
   include Context
-  include Creation
+  include ContributorCreation
   include ActionCableHelper
 
   CAUSES = %w[assess download file render run save submit test autosave requestComments remoteAssess
@@ -17,14 +17,19 @@ class Submission < ApplicationRecord
   has_many :testruns
   has_many :structured_errors, dependent: :destroy
   has_many :comments, through: :files
+  has_one :request_for_comment
+  has_one :user_exercise_feedback
+  has_one :pair_programming_exercise_feedback
 
   belongs_to :external_users, lambda {
-                                where(submissions: {user_type: 'ExternalUser'}).includes(:submissions)
-                              }, foreign_key: :user_id, class_name: 'ExternalUser', optional: true
+                                where(submissions: {contributor_type: 'ExternalUser'}).includes(:submissions)
+                              }, foreign_key: :contributor_id, class_name: 'ExternalUser', optional: true
   belongs_to :internal_users, lambda {
-                                where(submissions: {user_type: 'InternalUser'}).includes(:submissions)
-                              }, foreign_key: :user_id, class_name: 'InternalUser', optional: true
-
+                                where(submissions: {contributor_type: 'InternalUser'}).includes(:submissions)
+                              }, foreign_key: :contributor_id, class_name: 'InternalUser', optional: true
+  belongs_to :programming_groups, lambda {
+                                    where(submissions: {contributor_type: 'ProgrammingGroup'}).includes(:submissions)
+                                  }, foreign_key: :contributor_id, class_name: 'ProgrammingGroup', optional: true
   delegate :execution_environment, to: :exercise
 
   scope :final, -> { where(cause: %w[submit remoteSubmit]) }
@@ -50,15 +55,9 @@ class Submission < ApplicationRecord
 
   # after_save :trigger_working_times_action_cable
 
-  def build_files_hash(files, attribute)
-    files.map(&attribute.to_proc).zip(files).to_h
-  end
-
-  private :build_files_hash
-
   def collect_files
     @collect_files ||= begin
-      ancestors = build_files_hash(exercise.files.includes(:file_type), :id)
+      ancestors = build_files_hash(exercise&.files&.includes(:file_type), :id)
       descendants = build_files_hash(files.includes(:file_type), :file_id)
       ancestors.merge(descendants).values
     end
@@ -76,11 +75,11 @@ class Submission < ApplicationRecord
   end
 
   def normalized_score
-    if !score.nil? && !exercise.maximum_score.nil? && exercise.maximum_score.positive?
-      score / exercise.maximum_score
-    else
-      0
-    end
+    @normalized_score ||= if !score.nil? && !exercise.maximum_score.nil? && exercise.maximum_score.positive?
+                            score / exercise.maximum_score
+                          else
+                            0
+                          end
   end
 
   def percentage
@@ -88,7 +87,7 @@ class Submission < ApplicationRecord
   end
 
   def siblings
-    user.submissions.where(exercise_id:)
+    contributor.submissions.where(exercise_id:)
   end
 
   def to_s
@@ -125,11 +124,11 @@ class Submission < ApplicationRecord
     # Redirect 10% of users to the exercise feedback page. Ensure, that always the same
     # users get redirected per exercise and different users for different exercises. If
     # desired, the number of feedbacks can be limited with exercise.needs_more_feedback?(submission)
-    (user_id + exercise.created_at.to_i) % 10 == 1
+    (contributor_id + exercise.created_at.to_i) % 10 == 1
   end
 
-  def own_unsolved_rfc(user = self.user)
-    Pundit.policy_scope(user, RequestForComment).unsolved.find_by(exercise_id: exercise, user_id:)
+  def own_unsolved_rfc(user)
+    Pundit.policy_scope(user, RequestForComment).joins(:submission).where(submission: {contributor:}).unsolved.find_by(exercise:)
   end
 
   def unsolved_rfc(user = self.user)
@@ -145,7 +144,7 @@ class Submission < ApplicationRecord
 
   # @raise [Runner::Error] if the score could not be calculated due to a failure with the runner.
   #                        See the specific type and message for more details.
-  def calculate_score
+  def calculate_score(requesting_user)
     file_scores = nil
     # If prepared_runner raises an error, no Testrun will be created.
     prepared_runner do |runner, waiting_duration|
@@ -157,7 +156,7 @@ class Submission < ApplicationRecord
         output = run_test_file file, runner, waiting_duration
         # If the previous execution failed and there is at least one more test, we request a new runner.
         runner, waiting_duration = swap_runner(runner) if output[:status] == :timeout && index < assessment_number
-        score_file(output, file)
+        score_file(output, file, requesting_user)
       end
     end
     # We sort the files again, so that the linter tests are displayed last.
@@ -182,10 +181,10 @@ class Submission < ApplicationRecord
 
   # @raise [Runner::Error] if the file could not be tested due to a failure with the runner.
   #                        See the specific type and message for more details.
-  def test(file)
+  def test(file, requesting_user)
     prepared_runner do |runner, waiting_duration|
       output = run_test_file file, runner, waiting_duration
-      score_file output, file
+      score_file output, file, requesting_user
     rescue Runner::Error => e
       e.waiting_duration = waiting_duration
       raise
@@ -203,16 +202,24 @@ class Submission < ApplicationRecord
     %w[study_group_id exercise_id cause]
   end
 
+  def users
+    contributor.try(:users) || [contributor]
+  end
+
   private
+
+  def build_files_hash(files, attribute)
+    files&.map(&attribute.to_proc)&.zip(files)&.to_h || {}
+  end
 
   def prepared_runner
     request_time = Time.zone.now
     begin
-      runner = Runner.for(user, exercise.execution_environment)
+      runner = Runner.for(contributor, exercise.execution_environment)
       files = collect_files
       files.reject!(&:reference_implementation?) if cause == 'run'
       files.reject!(&:teacher_defined_assessment?) if cause == 'run'
-      Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Copying files to Runner #{runner.id} for #{user_type} #{user_id} and Submission #{id}." }
+      Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Copying files to Runner #{runner.id} for #{contributor_type} #{contributor_id} and Submission #{id}." }
       runner.copy_files(files)
     rescue Runner::Error => e
       e.waiting_duration = Time.zone.now - request_time
@@ -247,7 +254,7 @@ class Submission < ApplicationRecord
     }
   end
 
-  def score_file(output, file)
+  def score_file(output, file, requesting_user)
     assessor = Assessor.new(execution_environment:)
     assessment = assessor.assess(output)
     passed = ((assessment[:passed] == assessment[:count]) and (assessment[:score]).positive?)
@@ -260,6 +267,7 @@ class Submission < ApplicationRecord
     end
     testrun = Testrun.create(
       submission: self,
+      user: requesting_user,
       cause: 'assess', # Required to differ run and assess for RfC show
       file:, # Test file that was executed
       passed:,
@@ -283,7 +291,7 @@ class Submission < ApplicationRecord
     end
 
     output.merge!(assessment)
-    output.merge!(filename:, message: feedback_message(file, output), weight: file.weight)
+    output.merge!(filename:, message: feedback_message(file, output), weight: file.weight, hidden_feedback: file.hidden_feedback)
     output.except!(:messages)
   end
 
@@ -313,7 +321,7 @@ class Submission < ApplicationRecord
     update(score: score.to_d)
     if normalized_score.to_d == BigDecimal('1.0')
       Thread.new do
-        RequestForComment.where(exercise_id:, user_id:, user_type:).find_each do |rfc|
+        RequestForComment.joins(:submission).where(submission: {contributor:}, exercise:).find_each do |rfc|
           rfc.full_score_reached = true
           rfc.save
         end
@@ -329,12 +337,6 @@ class Submission < ApplicationRecord
       end
     end
 
-    # Return all test results except for those of a linter if not allowed
-    show_linter = Python20CourseWeek.show_linter? exercise
-    outputs&.reject do |output|
-      next if show_linter || output.blank?
-
-      output[:file_role] == 'teacher_defined_linter'
-    end
+    outputs&.reject {|output| output[:hidden_feedback] if output.present? }
   end
 end

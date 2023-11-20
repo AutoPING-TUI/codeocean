@@ -120,7 +120,10 @@ class Runner::Connection
   def on_message(raw_event, _sentry_span)
     Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Receiving from #{@socket.url}: #{raw_event.data.inspect}" }
     event = decode(raw_event.data)
-    return unless BACKEND_OUTPUT_SCHEMA.valid?(event)
+    unless BACKEND_OUTPUT_SCHEMA.valid?(event)
+      Sentry.capture_message('Received invalid JSON from runner management', extra: {event:})
+      return
+    end
 
     event = event.deep_symbolize_keys
     message_type = event[:type].to_sym
@@ -147,7 +150,7 @@ class Runner::Connection
 
   def on_close(event, sentry_span)
     Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Closing connection to #{@socket.url} with status: #{@status}" }
-    record_sentry_breadcrumb(event)
+    record_sentry_breadcrumb(sentry_span, event)
     end_sentry_span(sentry_span, event)
     flush_buffers
 
@@ -161,9 +164,19 @@ class Runner::Connection
         # However, it might not be required for Poseidon.
         @strategy.destroy_at_management
         @error = Runner::Error::ExecutionTimeout.new('Execution exceeded its time limit')
+      when :out_of_memory
+        # This status is only used by Poseidon (with gVisor).
+        # The runner will be destroyed (and recreated) automatically.
+        @error = Runner::Error::OutOfMemory.new('Execution exceeded its memory limit')
       when :terminated_by_codeocean, :terminated_by_management
-        @exit_callback.call @exit_code
-        list_filesystem
+        # Poseidon (without gVisor) and DockerContainerPool do not handle memory limits explicitly.
+        # Instead, they signal that the program was terminated with exit code 137 (128 + 9).
+        if @exit_code == 137
+          @error = Runner::Error::OutOfMemory.new('Execution exceeded its memory limit')
+        else
+          @exit_callback.call @exit_code
+          list_filesystem
+        end
       when :terminated_by_client, :error
         @strategy.destroy_at_management
       else # :established
@@ -223,6 +236,11 @@ class Runner::Connection
   end
 
   def handle_error(event)
+    # Poseidon (with gVisor enabled!) sends an error message when the execution exceeds its memory limit.
+    # This is not an error in the sense of the runner management but rather a message.
+    # We handle it here to avoid the error handling in the default case.
+    return @status = :out_of_memory if event[:data] == 'the allocation was OOM Killed'
+
     # In case of a (Nomad) error during execution, the runner management will notify us with an error message here.
     # This shouldn't happen too often and can be considered an internal server error by the runner management.
     # More information is available in the logs of the runner management or the orchestrator (e.g., Nomad).
@@ -250,17 +268,8 @@ class Runner::Connection
   def sentry_trace_header(sentry_span)
     return {} unless sentry_span
 
-    http_headers = {}
-    client = Sentry.get_current_client
-
-    trace = client.generate_sentry_trace(sentry_span)
-    http_headers[Sentry::SENTRY_TRACE_HEADER_NAME] = trace if trace
-
-    baggage = client.generate_baggage(sentry_span)
-    http_headers[Sentry::BAGGAGE_HEADER_NAME] = baggage if baggage.present?
-
     {
-      headers: http_headers,
+      headers: Sentry.get_trace_propagation_headers,
     }
   end
 
@@ -272,7 +281,8 @@ class Runner::Connection
     sentry_span.finish(end_timestamp: Sentry.utc_now.to_f)
   end
 
-  def record_sentry_breadcrumb(event)
+  def record_sentry_breadcrumb(sentry_span, event)
+    return unless sentry_span
     return unless Sentry.initialized? && Sentry.configuration.breadcrumbs_logger.include?(:http_logger)
 
     crumb = Sentry::Breadcrumb.new(
@@ -280,10 +290,11 @@ class Runner::Connection
       category: SENTRY_BREADCRUMB_CATEGORY,
       type: :info,
       data: {
-        status: event.code.to_i,
+        close_status: event.code.to_i,
+        connection_status: @status,
         url: @socket.url,
       }
     )
-    Sentry.add_breadcrumb(crumb)
+    sentry_span.transaction.hub.add_breadcrumb(crumb)
   end
 end

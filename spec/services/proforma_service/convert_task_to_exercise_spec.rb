@@ -2,11 +2,11 @@
 
 require 'rails_helper'
 
-describe ProformaService::ConvertTaskToExercise do
+RSpec.describe ProformaService::ConvertTaskToExercise do
   describe '.new' do
     subject(:convert_to_exercise_service) { described_class.new(task:, user:, exercise:) }
 
-    let(:task) { Proforma::Task.new }
+    let(:task) { ProformaXML::Task.new }
     let(:user) { build(:teacher) }
     let(:exercise) { build(:dummy) }
 
@@ -29,7 +29,7 @@ describe ProformaService::ConvertTaskToExercise do
     before { create(:dot_txt) }
 
     let(:task) do
-      Proforma::Task.new(
+      ProformaXML::Task.new(
         title: 'title',
         description: 'description',
         proglang: {name: 'python', version: '3.4'},
@@ -79,15 +79,34 @@ describe ProformaService::ConvertTaskToExercise do
     context 'when meta_data is set' do
       let(:meta_data) do
         {
-          CodeOcean: {
-            public:,
-            hide_file_tree:,
-            allow_file_creation:,
-            allow_auto_completion:,
-            expected_difficulty:,
-            execution_environment_id: execution_environment&.id,
-            files: files_meta_data,
-          },
+          '@@order' => ['meta-data'], 'meta-data' =>
+          {'@@order' => %w[CodeOcean:public CodeOcean:hide_file_tree CodeOcean:allow_file_creation CodeOcean:allow_auto_completion CodeOcean:expected_difficulty CodeOcean:execution_environment_id CodeOcean:files],
+           '@xmlns' => {'CodeOcean' => 'codeocean.openhpi.de'},
+           'CodeOcean:allow_auto_completion' => {
+             '@@order' => ['$1'],
+             '$1' => allow_auto_completion,
+           },
+           'CodeOcean:allow_file_creation' => {
+             '@@order' => ['$1'],
+             '$1' => allow_file_creation,
+           },
+           'CodeOcean:execution_environment_id' => {
+             '@@order' => ['$1'],
+             '$1' => execution_environment.id,
+           },
+           'CodeOcean:expected_difficulty' => {
+             '@@order' => ['$1'],
+             '$1' => expected_difficulty,
+           },
+           'CodeOcean:files' => {'@@order' => []},
+           'CodeOcean:hide_file_tree' => {
+             '@@order' => ['$1'],
+             '$1' => hide_file_tree,
+           },
+           'CodeOcean:public' => {
+             '@@order' => ['$1'],
+             '$1' => public,
+           }}
         }
       end
       let(:files_meta_data) { {} }
@@ -123,7 +142,7 @@ describe ProformaService::ConvertTaskToExercise do
     context 'when task has a file' do
       let(:files) { [file] }
       let(:file) do
-        Proforma::TaskFile.new(
+        ProformaXML::TaskFile.new(
           id: 'id',
           content:,
           filename:,
@@ -178,12 +197,22 @@ describe ProformaService::ConvertTaskToExercise do
       context 'when file is a main_file' do
         let(:meta_data) do
           {
-            CodeOcean: {
-              files: files_meta_data,
+            '@@order' => ['meta-data'], 'meta-data' => {
+              '@@order' => %w[CodeOcean:files],
+              '@xmlns' => {'CodeOcean' => 'codeocean.openhpi.de'},
+              'CodeOcean:files' => files_meta_data,
+            }
+          }
+        end
+        let(:files_meta_data) do
+          {
+            '@@order' => ["CodeOcean:CO-#{file.id}"],
+            "CodeOcean:CO-#{file.id}" => {
+              '@@order' => ['CodeOcean:role'],
+              'CodeOcean:role' => {'$1' => 'main_file', '@@order' => ['$1']},
             },
           }
         end
-        let(:files_meta_data) { {"CO-#{file.id}".to_sym => {role: 'main_file'}} }
 
         it 'creates an exercise with a file that has the correct attributes' do
           expect(convert_to_exercise_service.files.first).to have_attributes(role: 'main_file')
@@ -232,7 +261,7 @@ describe ProformaService::ConvertTaskToExercise do
       end
 
       context 'when file is a model-solution-placeholder (needed by proforma until issue #5 is resolved)' do
-        let(:file) { Proforma::TaskFile.new(id: 'ms-placeholder-file') }
+        let(:file) { ProformaXML::TaskFile.new(id: 'ms-placeholder-file') }
 
         it 'leaves exercise_files empty' do
           expect(convert_to_exercise_service.files).to be_empty
@@ -269,14 +298,14 @@ describe ProformaService::ConvertTaskToExercise do
     context 'when task has a model-solution' do
       let(:model_solutions) { [model_solution] }
       let(:model_solution) do
-        Proforma::ModelSolution.new(
+        ProformaXML::ModelSolution.new(
           id: 'ms-id',
           files: ms_files
         )
       end
       let(:ms_files) { [ms_file] }
       let(:ms_file) do
-        Proforma::TaskFile.new(
+        ProformaXML::TaskFile.new(
           id: 'ms-file',
           content: 'content',
           filename: 'filename.txt',
@@ -296,14 +325,14 @@ describe ProformaService::ConvertTaskToExercise do
       context 'when task has two model-solutions' do
         let(:model_solutions) { [model_solution, model_solution2] }
         let(:model_solution2) do
-          Proforma::ModelSolution.new(
+          ProformaXML::ModelSolution.new(
             id: 'ms-id-2',
             files: ms_files2
           )
         end
         let(:ms_files2) { [ms_file2] }
         let(:ms_file2) do
-          Proforma::TaskFile.new(
+          ProformaXML::TaskFile.new(
             id: 'ms-file-2',
             content: 'content',
             filename: 'filename.txt',
@@ -324,17 +353,18 @@ describe ProformaService::ConvertTaskToExercise do
     context 'when task has a test' do
       let(:tests) { [test] }
       let(:test) do
-        Proforma::Test.new(
+        ProformaXML::Test.new(
           id: 'test-id',
           title: 'title',
           description: 'description',
           test_type: 'test_type',
           files: test_files,
           meta_data: {
-            CodeOcean: {
-              'feedback-message': 'feedback-message',
-              'testing-framework': 'testing-framework',
-              'testing-framework-version': 'testing-framework-version',
+            'test-meta-data' => {
+              '@@order' => %w[CodeOcean:feedback-message CodeOcean:weight CodeOcean:hidden-feedback],
+              'CodeOcean:feedback-message' => {'$1' => 'feedback-message', '@@order' => ['$1']},
+              'CodeOcean:weight' => {'$1' => '0.7', '@@order' => ['$1']},
+              'CodeOcean:hidden-feedback' => {'$1' => 'true', '@@order' => ['$1']},
             },
           }
         )
@@ -342,7 +372,7 @@ describe ProformaService::ConvertTaskToExercise do
 
       let(:test_files) { [test_file] }
       let(:test_file) do
-        Proforma::TaskFile.new(
+        ProformaXML::TaskFile.new(
           id: 'test_file_id',
           content: 'testfile-content',
           filename: 'testfile.txt',
@@ -361,11 +391,13 @@ describe ProformaService::ConvertTaskToExercise do
       it 'creates an exercise with a test with correct attributes' do
         expect(convert_to_exercise_service.files.find {|file| file.role == 'teacher_defined_test' }).to have_attributes(
           feedback_message: 'feedback-message',
+          weight: 0.7,
           content: 'testfile-content',
           name: 'testfile',
           role: 'teacher_defined_test',
           hidden: true,
           read_only: true,
+          hidden_feedback: true,
           file_type: be_a(FileType).and(have_attributes(file_extension: '.txt'))
         )
       end
@@ -373,12 +405,22 @@ describe ProformaService::ConvertTaskToExercise do
       context 'when test file is a teacher_defined_linter' do
         let(:meta_data) do
           {
-            CodeOcean: {
-              files: files_meta_data,
+            '@@order' => ['meta-data'], 'meta-data' => {
+              '@@order' => %w[CodeOcean:files],
+            '@xmlns' => {'CodeOcean' => 'codeocean.openhpi.de'},
+            'CodeOcean:files' => files_meta_data,
+            }
+          }
+        end
+        let(:files_meta_data) do
+          {
+            '@@order' => ["CodeOcean:CO-#{test_file.id}"],
+            "CodeOcean:CO-#{test_file.id}" => {
+              '@@order' => ['CodeOcean:role'],
+              'CodeOcean:role' => {'$1' => 'teacher_defined_linter', '@@order' => ['$1']},
             },
           }
         end
-        let(:files_meta_data) { {"CO-#{test_file.id}".to_sym => {role: 'teacher_defined_linter'}} }
 
         it 'creates an exercise with a test' do
           expect(convert_to_exercise_service.files.select {|file| file.role == 'teacher_defined_linter' }).to have(1).item
@@ -388,20 +430,11 @@ describe ProformaService::ConvertTaskToExercise do
       context 'when task has multiple tests' do
         let(:tests) { [test, test2] }
         let(:test2) do
-          Proforma::Test.new(
-            files: test_files2,
-            meta_data: {
-              CodeOcean: {
-                'feedback-message': 'feedback-message',
-                'testing-framework': 'testing-framework',
-                'testing-framework-version': 'testing-framework-version',
-              },
-            }
-          )
+          ProformaXML::Test.new(files: test_files2)
         end
         let(:test_files2) { [test_file2] }
         let(:test_file2) do
-          Proforma::TaskFile.new(
+          ProformaXML::TaskFile.new(
             id: 'test_file_id2',
             content: 'testfile-content',
             filename: 'testfile.txt',
@@ -450,7 +483,7 @@ describe ProformaService::ConvertTaskToExercise do
       context 'with file, model solution and test' do
         let(:files) { [file] }
         let(:file) do
-          Proforma::TaskFile.new(
+          ProformaXML::TaskFile.new(
             id: 'id',
             content: 'content',
             filename: 'filename.txt',
@@ -462,24 +495,17 @@ describe ProformaService::ConvertTaskToExercise do
         end
         let(:tests) { [test] }
         let(:test) do
-          Proforma::Test.new(
+          ProformaXML::Test.new(
             id: 'test-id',
             title: 'title',
             description: 'description',
             test_type: 'test_type',
-            files: test_files,
-            meta_data: {
-              CodeOcean: {
-                'feedback-message': 'feedback-message',
-                'testing-framework': 'testing-framework',
-                'testing-framework-version': 'testing-framework-version',
-              },
-            }
+            files: test_files
           )
         end
         let(:test_files) { [test_file] }
         let(:test_file) do
-          Proforma::TaskFile.new(
+          ProformaXML::TaskFile.new(
             id: 'test_file_id',
             content: 'testfile-content',
             filename: 'testfile.txt',
@@ -492,14 +518,14 @@ describe ProformaService::ConvertTaskToExercise do
         end
         let(:model_solutions) { [model_solution] }
         let(:model_solution) do
-          Proforma::ModelSolution.new(
+          ProformaXML::ModelSolution.new(
             id: 'ms-id',
             files: ms_files
           )
         end
         let(:ms_files) { [ms_file] }
         let(:ms_file) do
-          Proforma::TaskFile.new(
+          ProformaXML::TaskFile.new(
             id: 'ms-file',
             content: 'ms-content',
             filename: 'filename.txt',

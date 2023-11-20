@@ -12,6 +12,7 @@ module CodeOcean
     TEACHER_DEFINED_ROLES = ROLES - %w[user_defined_file]
     OWNER_READ_PERMISSION = 0o400
     OTHER_READ_PERMISSION = 0o004
+    ALLOWED_CONTEXT_TYPES = %w[Exercise Submission CommunitySolution CommunitySolutionContribution].freeze
 
     after_initialize :set_default_values
     before_validation :clear_weight, unless: :teacher_defined_assessment?
@@ -31,6 +32,8 @@ module CodeOcean
     has_many :files, class_name: 'CodeOcean::File'
     has_many :testruns
     has_many :comments
+    has_one :request_for_comment
+    has_many :events_synchronized_editor, class_name: 'Event::SynchronizedEditor'
     alias descendants files
 
     mount_uploader :native_file, FileUploader
@@ -43,18 +46,20 @@ module CodeOcean
     end
     scope :teacher_defined_assessments, -> { where(role: %w[teacher_defined_test teacher_defined_linter]) }
 
-    default_scope { order(name: :asc) }
+    default_scope { order(path: :asc, name: :asc) }
 
     validates :feedback_message, if: :teacher_defined_assessment?, presence: true
     validates :feedback_message, absence: true, unless: :teacher_defined_assessment?
     validates :hashed_content, if: :content_present?, presence: true
     validates :hidden, inclusion: [true, false]
+    validates :hidden_feedback, inclusion: [true, false]
     validates :name, presence: true
     validates :read_only, inclusion: [true, false]
     validates :role, inclusion: {in: ROLES}
     validates :weight, if: :teacher_defined_assessment?, numericality: true, presence: true
     validates :weight, absence: true, unless: :teacher_defined_assessment?
     validates :file, presence: true if :context.is_a?(Submission)
+    validates :context_type, inclusion: {in: ALLOWED_CONTEXT_TYPES}
 
     validates_with FileNameValidator, fields: %i[name path file_type_id]
 
