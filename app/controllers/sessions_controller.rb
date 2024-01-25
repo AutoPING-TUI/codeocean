@@ -40,7 +40,7 @@ class SessionsController < ApplicationController
     if login(params[:email], params[:password], params[:remember_me])
       # We set the user's default study group to the "internal" group (no external id) for the given consumer.
       session[:study_group_id] = current_user.study_groups.find_by(external_id: nil)&.id
-      redirect_back_or_to(:root, notice: t('.success'))
+      sorcery_redirect_back_or_to(:root, notice: t('.success'))
     else
       flash.now[:danger] = t('.failure')
       render(:new)
@@ -50,8 +50,10 @@ class SessionsController < ApplicationController
   def destroy_through_lti
     @submission = Submission.find(params[:submission_id])
     authorize(@submission, :show?)
-    lti_parameter = current_user.lti_parameters.find_by(exercise: @submission.exercise, study_group_id: current_user.current_study_group_id)
-    @url = consumer_return_url(build_tool_provider(consumer: current_user.consumer, parameters: lti_parameter&.lti_parameters))
+    if current_user.external_user?
+      @lti_parameter = current_user.lti_parameters.find_by(exercise: @submission.exercise, study_group_id: current_user.current_study_group_id)
+      @url = consumer_return_url(build_tool_provider(consumer: current_user.consumer, parameters: @lti_parameter&.lti_parameters))
+    end
   end
 
   def destroy

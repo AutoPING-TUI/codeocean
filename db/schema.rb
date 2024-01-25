@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2023_10_29_172331) do
+ActiveRecord::Schema[7.1].define(version: 2023_12_08_194632) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_trgm"
   enable_extension "pgcrypto"
@@ -454,6 +454,8 @@ ActiveRecord::Schema[7.1].define(version: 2023_10_29_172331) do
     t.datetime "updated_at"
     t.string "user_type"
     t.bigint "study_group_id"
+    t.bigint "programming_group_id"
+    t.index ["programming_group_id"], name: "index_remote_evaluation_mappings_on_programming_group_id"
     t.index ["study_group_id"], name: "index_remote_evaluation_mappings_on_study_group_id"
   end
 
@@ -636,14 +638,17 @@ ActiveRecord::Schema[7.1].define(version: 2023_10_29_172331) do
   end
 
   create_table "user_exercise_interventions", id: :serial, force: :cascade do |t|
-    t.integer "user_id"
-    t.string "user_type"
-    t.integer "exercise_id"
-    t.integer "intervention_id"
+    t.integer "contributor_id", null: false
+    t.string "contributor_type", null: false
+    t.integer "exercise_id", null: false
+    t.integer "intervention_id", null: false
     t.integer "accumulated_worktime_s"
     t.text "reason"
     t.datetime "created_at"
     t.datetime "updated_at"
+    t.index ["contributor_type", "contributor_id"], name: "idx_on_contributor_type_contributor_id_10a7504bcc"
+    t.index ["exercise_id"], name: "index_user_exercise_interventions_on_exercise_id"
+    t.index ["intervention_id"], name: "index_user_exercise_interventions_on_intervention_id"
   end
 
   create_table "user_proxy_exercise_exercises", id: :serial, force: :cascade do |t|
@@ -686,6 +691,7 @@ ActiveRecord::Schema[7.1].define(version: 2023_10_29_172331) do
   add_foreign_key "pair_programming_waiting_users", "programming_groups"
   add_foreign_key "programming_group_memberships", "programming_groups"
   add_foreign_key "programming_groups", "exercises"
+  add_foreign_key "remote_evaluation_mappings", "programming_groups"
   add_foreign_key "remote_evaluation_mappings", "study_groups"
   add_foreign_key "structured_error_attributes", "error_template_attributes"
   add_foreign_key "structured_error_attributes", "structured_errors"
@@ -699,4 +705,6 @@ ActiveRecord::Schema[7.1].define(version: 2023_10_29_172331) do
   add_foreign_key "testruns", "submissions"
   add_foreign_key "tips", "file_types"
   add_foreign_key "user_exercise_feedbacks", "submissions"
+  add_foreign_key "user_exercise_interventions", "exercises"
+  add_foreign_key "user_exercise_interventions", "interventions"
 end

@@ -14,8 +14,9 @@ RSpec.describe ExercisesController do
   end
 
   describe 'PUT #batch_update' do
-    let(:attributes) { ActionController::Parameters.new(public: 'true').permit! }
-    let(:perform_request) { proc { put :batch_update, params: {exercises: {0 => attributes.merge(id: exercise.id)}} } }
+    let(:attributes) { {public: 'true'} }
+    let(:params) { ActionController::Parameters.new(public: 'true').permit! }
+    let(:perform_request) { proc { put :batch_update, params: {exercises: {0 => params.merge(id: exercise.id)}} } }
 
     before { perform_request.call }
 
@@ -285,98 +286,6 @@ RSpec.describe ExercisesController do
         expect(submissions).to match_array Submission.all
         expect(submissions).to include an_object_having_attributes(cause: 'autosave', contributor: external_user)
       end
-    end
-  end
-
-  describe 'POST #submit' do
-    let(:output) { {} }
-    let(:perform_request) { post :submit, format: :json, params: {id: exercise.id, submission: {cause: 'submit', exercise_id: exercise.id}} }
-    let(:contributor) { create(:external_user) }
-    let(:scoring_response) do
-      [{
-        status: :ok,
-        stdout: '',
-        stderr: '',
-        waiting_for_container_time: 0,
-        container_execution_time: 0,
-        file_role: 'teacher_defined_test',
-        count: 1,
-        failed: 0,
-        error_messages: [],
-        passed: 1,
-        score: 1.0,
-        filename: 'index.html_spec.rb',
-        message: 'Well done.',
-        weight: 2.0,
-      }]
-    end
-
-    before do
-      create(:lti_parameter, external_user: contributor, exercise:)
-      submission = build(:submission, exercise:, contributor:)
-      allow(submission).to receive_messages(normalized_score: 1, calculate_score: scoring_response, redirect_to_feedback?: false)
-      allow(Submission).to receive(:create).and_return(submission)
-    end
-
-    context 'when LTI outcomes are supported' do
-      before do
-        allow(controller).to receive(:lti_outcome_service?).and_return(true)
-      end
-
-      context 'when the score transmission succeeds' do
-        before do
-          allow(controller).to receive(:send_scores).and_return([{status: 'success'}])
-          perform_request
-        end
-
-        expect_assigns(exercise: :exercise)
-
-        it 'creates a submission' do
-          expect(assigns(:submission)).to be_a(Submission)
-        end
-
-        expect_json
-        expect_http_status(:ok)
-      end
-
-      context 'when the score transmission fails' do
-        before do
-          allow(controller).to receive(:send_scores).and_return([{status: 'unsupported'}])
-          perform_request
-        end
-
-        expect_assigns(exercise: :exercise)
-
-        it 'creates a submission' do
-          expect(assigns(:submission)).to be_a(Submission)
-        end
-
-        it 'returns an error message' do
-          expect(response.parsed_body).to eq('danger' => I18n.t('exercises.submit.failure'))
-        end
-
-        expect_json
-      end
-    end
-
-    context 'when LTI outcomes are not supported' do
-      before do
-        allow(controller).to receive(:lti_outcome_service?).and_return(false)
-        perform_request
-      end
-
-      expect_assigns(exercise: :exercise)
-
-      it 'creates a submission' do
-        expect(assigns(:submission)).to be_a(Submission)
-      end
-
-      it 'does not send scores' do
-        expect(controller).not_to receive(:send_scores)
-      end
-
-      expect_json
-      expect_http_status(:ok)
     end
   end
 

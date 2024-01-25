@@ -10,7 +10,7 @@ class ExercisesController < ApplicationController
   before_action :handle_file_uploads, only: %i[create update]
   before_action :set_execution_environments, only: %i[index create edit new update]
   before_action :set_exercise_and_authorize,
-    only: MEMBER_ACTIONS + %i[clone implement working_times intervention statistics submit reload feedback
+    only: MEMBER_ACTIONS + %i[clone implement working_times intervention statistics reload feedback
                               study_group_dashboard export_external_check export_external_confirm
                               external_user_statistics]
   before_action :collect_set_and_unset_exercise_tags, only: MEMBER_ACTIONS
@@ -39,12 +39,17 @@ class ExercisesController < ApplicationController
   end
 
   def batch_update
-    @exercises = Exercise.all
+    update_map = {}
+    update_params = params.permit(exercises: %i[id public])
+    update_params[:exercises].each_value do |param|
+      update_map[param[:id]] = param[:public]
+    end
+
+    @exercises = Exercise.where(id: update_map.keys).includes(:execution_environment, :files)
     authorize!
-    @exercises = params[:exercises].values.map do |exercise_params|
-      exercise = Exercise.find(exercise_params.delete(:id))
-      exercise.update(exercise_params.permit(:public))
-      exercise
+
+    @exercises.each do |exercise|
+      exercise.update(public: update_map[exercise.id.to_s])
     end
     render(json: {exercises: @exercises})
   end
@@ -95,7 +100,7 @@ class ExercisesController < ApplicationController
       .includes(:exercise, user: [:programming_groups])
       .paginate(page: params[:page], per_page: per_page_param)
     @submissions = @feedbacks.map do |feedback|
-      feedback.exercise.final_submission(feedback.user.programming_groups.select {|pg| pg.exercise = @exercise }.presence || feedback.user)
+      feedback.exercise.final_submission(feedback.user.programming_groups.find_by(exercise: @exercise).presence || feedback.user)
     end
   end
 
@@ -180,7 +185,7 @@ class ExercisesController < ApplicationController
 
   def user_from_api_key
     authorization_header = request.headers['Authorization']
-    api_key = authorization_header&.split(' ')&.second
+    api_key = authorization_header&.split&.second
     user_by_codeharbor_token(api_key)
   end
 
@@ -308,8 +313,8 @@ class ExercisesController < ApplicationController
         session.delete(:pair_programming)
         @current_contributor = current_user
       else
-        return redirect_back(
-          fallback_location: implement_exercise_path(current_contributor.exercise),
+        return redirect_back_or_to(
+          implement_exercise_path(current_contributor.exercise),
           alert: t('exercises.implement.existing_programming_group', exercise: current_contributor.exercise.title)
         )
       end
@@ -318,16 +323,15 @@ class ExercisesController < ApplicationController
       session[:pg_id] = pg.id
       @current_contributor = pg
     elsif session[:pg_id].blank? && session[:pair_programming] == 'mandatory'
-      return redirect_back(fallback_location: new_exercise_programming_group_path(@exercise))
+      return redirect_back_or_to(new_exercise_programming_group_path(@exercise))
     elsif session[:pg_id].blank? && session[:pair_programming] == 'optional' && current_user.submissions.where(study_group_id: current_user.current_study_group_id, exercise: @exercise).none?
       Event.find_or_create_by(category: 'pp_work_alone', user: current_user, exercise: @exercise, data: nil, file_id: nil)
       current_user.pair_programming_waiting_users&.find_by(exercise: @exercise)&.update(status: :worked_alone)
     end
 
     user_solved_exercise = @exercise.solved_by?(current_contributor)
-    count_interventions_today = UserExerciseIntervention.where(user: current_user).where(created_at: Time.zone.now.beginning_of_day..).count
-    user_got_intervention_in_exercise = UserExerciseIntervention.where(user: current_user,
-      exercise: @exercise).size >= max_intervention_count_per_exercise
+    count_interventions_today = current_contributor.user_exercise_interventions.where(created_at: Time.zone.now.beginning_of_day..).count
+    user_got_intervention_in_exercise = current_contributor.user_exercise_interventions.where(exercise: @exercise).size >= max_intervention_count_per_exercise
     (user_got_enough_interventions = count_interventions_today >= max_intervention_count_per_day) || user_got_intervention_in_exercise
 
     if @embed_options[:disable_interventions]
@@ -521,10 +525,10 @@ class ExercisesController < ApplicationController
       submissions = Submission.where(contributor: @external_user, exercise: @exercise)
         .in_study_group_of(current_user)
         .order(:created_at)
-      @show_autosaves = params[:show_autosaves] == 'true' || submissions.none? {|s| s.cause != 'autosave' }
+        .includes(:exercise, testruns: [:testrun_messages, {file: [:file_type]}], files: [:file_type])
+      @show_autosaves = params[:show_autosaves] == 'true' || submissions.where.not(cause: 'autosave').none?
       submissions = submissions.where.not(cause: 'autosave') unless @show_autosaves
-      interventions = UserExerciseIntervention.where('user_id = ?  AND exercise_id = ?', @external_user.id,
-        @exercise.id)
+      interventions = @external_user.user_exercise_interventions.where(exercise: @exercise)
       @all_events = (submissions + interventions).sort_by(&:created_at)
       @deltas = @all_events.map.with_index do |item, index|
         delta = item.created_at - @all_events[index - 1].created_at if index.positive?
@@ -547,57 +551,6 @@ class ExercisesController < ApplicationController
 
     render 'exercises/external_users/statistics'
   end
-
-  def submit
-    @submission = Submission.create(submission_params)
-    @submission.calculate_score(current_user)
-
-    if @submission.users.map {|user| lti_outcome_service?(@submission.exercise, user, @submission.study_group_id) }.any?
-      transmit_lti_score
-    else
-      redirect_after_submit
-    end
-  rescue Runner::Error => e
-    Rails.logger.debug { "Runner error while submitting submission #{@submission.id}: #{e.message}" }
-    respond_to do |format|
-      format.html { redirect_to(implement_exercise_path(@submission.exercise)) }
-      format.json { render(json: {danger: I18n.t('exercises.editor.depleted'), status: :container_depleted}) }
-    end
-  end
-
-  def transmit_lti_score
-    responses = send_scores(@submission)
-    messages = {}
-    failed_users = []
-
-    responses.each do |response|
-      if Lti::ERROR_STATUS.include? response[:status]
-        failed_users << response[:user]
-      elsif response[:score_sent] != @submission.normalized_score # the score was sent successfully, but received too late
-        messages[:warning] = I18n.t('exercises.submit.too_late')
-      end
-    end
-
-    if failed_users.size == responses.size # all submissions failed
-      messages[:danger] = I18n.t('exercises.submit.failure')
-    elsif failed_users.size.positive? # at least one submission failed
-      messages[:warning] = [[messages[:warning]], I18n.t('exercises.submit.warning_not_for_all_users_submitted', user: failed_users.join(', '))].join('<br><br>')
-      messages[:warning] = "#{messages[:warning]}\n\n#{I18n.t('exercises.submit.warning_not_for_all_users_submitted', user: failed_users.join(', '))}".strip
-    else
-      messages.each do |type, message_text|
-        flash.now[type] = message_text
-        flash.keep(type)
-      end
-      return redirect_after_submit
-    end
-
-    respond_to do |format|
-      format.html { redirect_to(implement_exercise_path(@submission.exercise), **messages) }
-      format.json { render(json: messages) } # We must not change the HTTP status code here, since otherwise the custom message is not displayed.
-    end
-  end
-
-  private :transmit_lti_score
 
   def destroy
     destroy_and_respond(object: @exercise)

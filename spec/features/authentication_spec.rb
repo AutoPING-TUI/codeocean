@@ -3,8 +3,8 @@
 require 'rails_helper'
 
 RSpec.describe 'Authentication' do
-  let(:user) { create(:admin) }
-  let(:password) { attributes_for(:admin)[:password] }
+  let(:user) { create(:teacher) }
+  let(:password) { attributes_for(:teacher)[:password] }
 
   context 'when signed out' do
     before { visit(root_path) }
@@ -15,21 +15,53 @@ RSpec.describe 'Authentication' do
 
     context 'with valid credentials' do
       it 'allows to sign in' do
-        click_link(I18n.t('sessions.new.link'))
+        click_link(I18n.t('sessions.new.link')) # rubocop:disable Capybara/ClickLinkOrButtonStyle
         fill_in('Email', with: user.email)
         fill_in('Password', with: password)
-        click_button(I18n.t('sessions.new.link'))
+        click_button(I18n.t('sessions.new.link')) # rubocop:disable Capybara/ClickLinkOrButtonStyle
         expect(page).to have_content(I18n.t('sessions.create.success'))
       end
     end
 
     context 'with invalid credentials' do
       it 'does not allow to sign in' do
-        click_link(I18n.t('sessions.new.link'))
+        click_link(I18n.t('sessions.new.link')) # rubocop:disable Capybara/ClickLinkOrButtonStyle
         fill_in('Email', with: user.email)
         fill_in('Password', with: password.reverse)
-        click_button(I18n.t('sessions.new.link'))
+        click_button(I18n.t('sessions.new.link')) # rubocop:disable Capybara/ClickLinkOrButtonStyle
         expect(page).to have_content(I18n.t('sessions.create.failure'))
+      end
+    end
+
+    context 'when a restricted sub-page is opened' do
+      let(:exercise) { create(:math, user:, public: false) }
+
+      before { visit(exercise_path(exercise)) }
+
+      it 'displays a sign in link' do
+        expect(page).to have_content(I18n.t('sessions.new.link'))
+      end
+
+      it 'shows a notification' do
+        expect(page).to have_content(I18n.t('application.not_signed_in'))
+      end
+
+      it 'redirects to the desired page immediately after sign-in' do
+        fill_in('Email', with: user.email)
+        fill_in('Password', with: password)
+        click_button(I18n.t('sessions.new.link')) # rubocop:disable Capybara/ClickLinkOrButtonStyle
+        expect(page).to have_content(exercise.title)
+      end
+
+      context 'when a user still has no access' do
+        let(:exercise) { create(:math, public: false) }
+
+        it 'informs the user about missing permissions' do
+          fill_in('Email', with: user.email)
+          fill_in('Password', with: password)
+          click_button(I18n.t('sessions.new.link')) # rubocop:disable Capybara/ClickLinkOrButtonStyle
+          expect(page).to have_content(I18n.t('application.not_authorized'))
+        end
       end
     end
 
@@ -39,10 +71,10 @@ RSpec.describe 'Authentication' do
 
       it 'denies access to the request for comment' do
         visit(rfc_path)
-        expect(page).not_to have_current_path(rfc_path)
-        expect(page).not_to have_content(request_for_comment.exercise.title)
-        expect(page).to have_current_path(root_path)
-        expect(page).to have_content(I18n.t('application.not_authorized'))
+        expect(page).to have_no_current_path(rfc_path)
+        expect(page).to have_no_content(request_for_comment.exercise.title)
+        expect(page).to have_current_path(sign_in_path)
+        expect(page).to have_content(I18n.t('application.not_signed_in'))
       end
     end
 
@@ -73,10 +105,10 @@ RSpec.describe 'Authentication' do
         it 'denies access to the request for comment' do
           mail.deliver_now
           visit(rfc_link)
-          expect(page).not_to have_current_path(rfc_link)
-          expect(page).not_to have_content(request_for_comment.exercise.title)
-          expect(page).to have_current_path(root_path)
-          expect(page).to have_content(I18n.t('application.not_authorized'))
+          expect(page).to have_no_current_path(rfc_link)
+          expect(page).to have_no_content(request_for_comment.exercise.title)
+          expect(page).to have_current_path(sign_in_path)
+          expect(page).to have_content(I18n.t('application.not_signed_in'))
         end
       end
 
@@ -95,7 +127,7 @@ RSpec.describe 'Authentication' do
           expect(page).to have_current_path(rfc_link)
           visit(sign_out_path)
           visit(rfc_link)
-          expect(page).to have_current_path(root_path)
+          expect(page).to have_current_path(sign_in_path)
         end
       end
     end
@@ -132,7 +164,7 @@ RSpec.describe 'Authentication' do
     end
 
     it 'allows to sign out' do
-      click_link(I18n.t('sessions.destroy.link'))
+      click_on(I18n.t('sessions.destroy.link'))
       expect(page).to have_content(I18n.t('sessions.destroy.success'))
     end
   end

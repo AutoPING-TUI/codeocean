@@ -100,13 +100,13 @@ $(document).on('turbolinks:load', function () {
         event.preventDefault();
         var fileUrl = $(event.target).data('file-url');
 
-        if (confirm('<%= I18n.t('shared.confirm_destroy') %>')) {
+        if (confirm(I18n.t('shared.confirm_destroy'))) {
             var jqxhr = $.ajax({
                 // normal file path (without json) would destroy the context object (the exercise) as well, due to redirection
                 // to the context after the :destroy action.
-                contentType: 'Application/json',
-                url: fileUrl + '.json',
-                method: 'DELETE'
+                dataType: 'json',
+                method: 'DELETE',
+                url: fileUrl,
             });
             jqxhr.done(function () {
                 removeFileForm(fileUrl)
@@ -128,11 +128,16 @@ $(document).on('turbolinks:load', function () {
     var buildCheckboxes = function () {
         $('tbody tr').each(function (index, element) {
             var td = $('td.public', element);
-            var checkbox = $('<input class="form-check-input">', {
+            var checkbox = $('<input>', {
                 checked: td.data('value'),
-                type: 'checkbox'
+                type: 'checkbox',
+                class: 'form-check-input',
             });
             td.on('click', function (event) {
+                if (event.target !== this) {
+                    // We don't want to trigger the handler when clicking directly on the checkbox.
+                    return;
+                }
                 event.preventDefault();
                 checkbox.prop('checked', !checkbox.prop('checked'));
             });
@@ -186,12 +191,11 @@ $(document).on('turbolinks:load', function () {
 
         function serialize(sortable) {
             let serialized = [];
-            const children = [].slice.call(sortable.children);
-            for (let i in children) {
-                const nested = children[i].querySelector(nestedQuery);
+            for (const child of sortable.children) {
+                const nested = child.querySelector(nestedQuery);
                 serialized.push({
-                    tip_id: children[i].dataset['tipId'],
-                    id: children[i].dataset['id'],
+                    tip_id: child.dataset['tipId'],
+                    id: child.dataset['id'],
                     children: nested ? serialize(nested) : []
                 });
             }
@@ -231,7 +235,7 @@ $(document).on('turbolinks:load', function () {
             const template =
                 '<div class="list-group-item d-block" data-tip-id=' + tip.id + ' data-id="">' +
                 '<span class="fa-solid fa-bars me-3"></span>' + tip.title +
-                '<a class="fa-regular fa-eye ms-2" href="/tips/' + tip.id + '" target="_blank"></a>' +
+                `<a class="fa-regular fa-eye ms-2" href="${Routes.tip_path(tip.id)}" target="_blank"></a>` +
                 '<a class="fa-solid fa-xmark ms-2 remove-tip" href="#""></a>' +
                 '<div class="list-group nested-sortable-list"></div>' +
                 '</div>';
@@ -297,6 +301,7 @@ $(document).on('turbolinks:load', function () {
                 fields.slideUp();
                 parent.find('[name$="[feedback_message]"]').val('');
                 parent.find('[name$="[weight]"]').val(1);
+                parent.find('[name$="[hidden_feedback]"]').prop('checked', false);
             }
         });
     };
@@ -307,7 +312,7 @@ $(document).on('turbolinks:load', function () {
             new_execution_environment = $('#exercise_execution_environment_id').val();
 
             if (new_execution_environment == '' && !$('#exercise_unpublished').prop('checked')) {
-                if (confirm('<%= I18n.t('exercises.form.unpublish_warning') %>')) {
+                if (confirm(I18n.t('exercises.form.unpublish_warning'))) {
                     $('#exercise_unpublished').prop('checked', true);
                 } else {
                     return $('#exercise_execution_environment_id').val(old_execution_environment).trigger("chosen:updated");
@@ -320,11 +325,11 @@ $(document).on('turbolinks:load', function () {
     var observeUnpublishedState = function () {
         $('#exercise_unpublished').on('change', function () {
             if ($('#exercise_unpublished').prop('checked')) {
-                if (!confirm('<%= I18n.t('exercises.form.unpublish_warning') %>')) {
+                if (!confirm(I18n.t('exercises.form.unpublish_warning'))) {
                     $('#exercise_unpublished').prop('checked', false);
                 }
-            } else if ($('#exercise_execution_environment_id').val() == '') {
-                alert('<%= I18n.t('exercises.form.no_execution_environment_selected') %>');
+            } else if ($('#exercise_execution_environment_id').val() === '') {
+                alert(I18n.t('exercises.form.no_execution_environment_selected'));
                 $('#exercise_unpublished').prop('checked', true);
             }
         })
@@ -351,7 +356,7 @@ $(document).on('turbolinks:load', function () {
 
         $messageDiv.removeClass('export-failure');
 
-        $messageDiv.html('<%= I18n.t('exercises.export_codeharbor.checking_codeharbor') %>');
+        $messageDiv.html(I18n.t('exercises.export_codeharbor.checking_codeharbor'));
         $actionsDiv.html('<div class="spinner-border"></div>');
 
         return $.ajax({

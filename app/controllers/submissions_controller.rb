@@ -2,12 +2,14 @@
 
 class SubmissionsController < ApplicationController
   include CommonBehavior
-  include Lti
   include FileConversion
+  include Lti
+  include RedirectBehavior
+  include ScoringChecks
   include SubmissionParameters
   include Tubesock::Hijack
 
-  before_action :set_submission, only: %i[download download_file run score show statistics test]
+  before_action :set_submission, only: %i[download download_file run score show statistics test finalize]
   before_action :set_testrun, only: %i[run score test]
   before_action :set_files, only: %i[download show]
   before_action :set_files_and_specific_file, only: %i[download_file run test]
@@ -44,8 +46,7 @@ class SubmissionsController < ApplicationController
 
       # zip .co file
       zio.put_next_entry('.co')
-      zio.write(File.read(id_file))
-      FileUtils.rm_rf(id_file)
+      zio.write(id_file)
 
       # zip client scripts
       scripts_path = 'app/assets/remote_scripts'
@@ -70,6 +71,11 @@ class SubmissionsController < ApplicationController
       response.set_header('Content-Length', @file.size)
       send_data(@file.content, type: 'application/octet-stream', filename: @file.name_with_extension, disposition: 'attachment')
     end
+  end
+
+  def finalize
+    @submission.update!(cause: 'submit')
+    redirect_after_submit
   end
 
   def show; end
@@ -166,7 +172,7 @@ class SubmissionsController < ApplicationController
     durations = @submission.run(@file) do |socket, starting_time|
       runner_socket = socket
       @testrun[:starting_time] = starting_time
-      client_socket.send_data JSON.dump({cmd: :status, status: :container_running})
+      client_socket.send_data({cmd: :status, status: :container_running}.to_json)
 
       runner_socket.on :stdout do |data|
         message = retrieve_message_from_output data, :stdout
@@ -256,9 +262,14 @@ class SubmissionsController < ApplicationController
     return true if disable_scoring
 
     # The score is stored separately, we can forward it to the client immediately
-    client_socket&.send_data(JSON.dump(@submission.calculate_score(current_user)))
+    client_socket&.send_data(@submission.calculate_score(current_user).to_json)
     # To enable hints when scoring a submission, uncomment the next line:
     # send_hints(client_socket, StructuredError.where(submission: @submission))
+
+    # Finally, send the score to the LTI consumer and check for notifications
+    check_submission(send_scores(@submission)).compact.each do |notification|
+      client_socket&.send_data(notification&.merge(cmd: :status)&.to_json)
+    end
   rescue Runner::Error::RunnerInUse => e
     extract_durations(e)
     send_and_store client_socket, {cmd: :status, status: :runner_in_use}
@@ -300,7 +311,7 @@ class SubmissionsController < ApplicationController
     return true if @embed_options[:disable_run]
 
     # The score is stored separately, we can forward it to the client immediately
-    client_socket&.send_data(JSON.dump(@submission.test(@file, current_user)))
+    client_socket&.send_data(@submission.test(@file, current_user).to_json)
   rescue Runner::Error::RunnerInUse => e
     extract_durations(e)
     send_and_store client_socket, {cmd: :status, status: :runner_in_use}
@@ -338,7 +349,7 @@ class SubmissionsController < ApplicationController
     return unless client_socket
 
     # We don't want to store this (arbitrary) exit command and redirect it ourselves
-    client_socket.send_data JSON.dump({cmd: :exit})
+    client_socket.send_data({cmd: :exit}.to_json)
     client_socket.send_data nil, :close
     # We must not close the socket manually (with `client_socket.close`), as this would close it twice.
     # When the socket is closed twice, nginx registers a `Connection reset by peer` error.
@@ -346,17 +357,15 @@ class SubmissionsController < ApplicationController
   end
 
   def create_remote_evaluation_mapping
-    user = @submission.user
-    exercise_id = @submission.exercise_id
+    programming_group = current_contributor if current_contributor.programming_group?
 
     remote_evaluation_mapping = RemoteEvaluationMapping.create(
-      user:,
-      exercise_id:,
+      user: current_user,
+      programming_group:,
+      exercise: @submission.exercise,
       study_group_id: session[:study_group_id]
     )
 
-    # create .co file
-    path = "tmp/#{user.id}.co"
     # parse validation token
     content = "#{remote_evaluation_mapping.validation_token}\n"
     # parse remote request url
@@ -364,8 +373,7 @@ class SubmissionsController < ApplicationController
     @submission.files.each do |file|
       content += "#{file.filepath}=#{file.file_id}\n"
     end
-    File.write(path, content)
-    path
+    content
   end
 
   def extract_durations(error)
@@ -401,7 +409,7 @@ class SubmissionsController < ApplicationController
                           end
     @testrun[:messages].push message
     @testrun[:status] = message[:status] if message[:status]
-    client_socket.send_data JSON.dump(message)
+    client_socket.send_data(message.to_json)
   end
 
   def max_output_buffer_size
@@ -455,11 +463,6 @@ class SubmissionsController < ApplicationController
     @files = @submission.collect_files.select(&:visible)
   end
 
-  def set_content_type_nosniff
-    # When sending a file, we want to ensure that browsers follow our Content-Type header
-    response.headers['X-Content-Type-Options'] = 'nosniff'
-  end
-
   def set_submission
     @submission = Submission.find(params[:id])
     authorize!
@@ -490,6 +493,7 @@ class SubmissionsController < ApplicationController
 
   def augment_files_for_download(files)
     submission_files = @submission.collect_files + @submission.exercise.files
+    host = ApplicationController::RENDER_HOST || request.host
     files.filter_map do |file|
       # Reject files that were already present in the submission
       # We further reject files that share the same name (excl. file extension) and path as a file in the submission
@@ -497,7 +501,7 @@ class SubmissionsController < ApplicationController
       next if submission_files.any? {|submission_file| submission_file.filepath_without_extension == file.filepath_without_extension }
 
       # Downloadable files get a signed download_path and an indicator whether we performed a privileged execution
-      file.download_path = AuthenticatedUrlHelper.sign(download_stream_file_submission_url(@submission, file.filepath), @submission)
+      file.download_path = AuthenticatedUrlHelper.sign(download_stream_file_submission_url(@submission, file.filepath, host:), @submission)
       file.privileged_execution = @submission.execution_environment.privileged_execution
       file
     end

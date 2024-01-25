@@ -4,15 +4,24 @@ class LiveStreamsController < ApplicationController
   # Including ActionController::Live changes all actions in this controller!
   # Therefore, it is extracted into a separate controller
   include ActionController::Live
+  before_action :set_content_type_nosniff
+
+  skip_before_action :deny_access_from_render_host, only: :download_submission_file
+  skip_before_action :verify_authenticity_token, only: :download_submission_file
+  skip_before_action :set_sentry_context, only: :download_submission_file
+  before_action :require_user!, except: :download_submission_file
 
   def download_submission_file
-    @submission = authorize AuthenticatedUrlHelper.retrieve!(Submission, request, force_render_host: false)
+    @submission = AuthenticatedUrlHelper.retrieve!(Submission, request)
+    # Set @current_user with the corresponding learner for Pundit checks
+    @current_user = @submission.user
+    authorize @submission
   rescue Pundit::NotAuthorizedError
     # TODO: Option to disable?
     # Using the submission ID parameter would allow looking up the corresponding exercise ID
     # Therefore, we just redirect to the root_path, but actually expect to redirect back (that should work!)
     skip_authorization
-    redirect_back(fallback_location: root_path, allow_other_host: true, alert: t('exercises.download_file_tree.gone'))
+    redirect_back_or_to(root_path, allow_other_host: true, alert: t('exercises.download_file_tree.gone'))
   else
     desired_file = params[:filename].to_s
     runner = Runner.for(current_contributor, @submission.exercise.execution_environment)
@@ -22,7 +31,7 @@ class LiveStreamsController < ApplicationController
 
   def download_arbitrary_file
     @execution_environment = authorize ExecutionEnvironment.find(params[:id])
-    desired_file = params[:filename].to_s
+    desired_file = "/#{params[:filename]}" # The filename given is absolute; this is an admin-only action.
     runner = Runner.for(current_user, @execution_environment)
     fallback_location = shell_execution_environment_path(@execution_environment)
     privileged = params[:sudo] || @execution_environment.privileged_execution?
@@ -56,7 +65,7 @@ class LiveStreamsController < ApplicationController
         end
       end
     rescue Runner::Error
-      redirect_back(fallback_location: redirect_fallback, alert: t('exercises.download_file_tree.gone'))
+      redirect_back_or_to(redirect_fallback, alert: t('exercises.download_file_tree.gone'))
     end
   end
 end

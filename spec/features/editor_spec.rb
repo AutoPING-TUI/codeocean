@@ -29,7 +29,7 @@ RSpec.describe 'Editor', :js do
     visit(sign_in_path)
     fill_in('email', with: contributor.email)
     fill_in('password', with: attributes_for(:teacher)[:password])
-    click_button(I18n.t('sessions.new.link'))
+    click_button(I18n.t('sessions.new.link')) # rubocop:disable Capybara/ClickLinkOrButtonStyle
     allow_any_instance_of(LtiHelper).to receive(:lti_outcome_service?).and_return(true)
     visit(implement_exercise_path(exercise))
   end
@@ -56,7 +56,7 @@ RSpec.describe 'Editor', :js do
 
   context 'when selecting a file' do
     before do
-      within('#files') { click_link(file.name_with_extension) }
+      within('#files') { click_on(file.name_with_extension) }
     end
 
     context 'when selecting a binary file' do
@@ -106,16 +106,7 @@ RSpec.describe 'Editor', :js do
     it 'disables the score button' do
       visit(implement_exercise_path(exercise_without_test))
       expect(page).to have_content(exercise_without_test.title)
-      expect(page).not_to have_content(I18n.t('exercises.editor.score'))
+      expect(page).to have_no_content(I18n.t('exercises.editor.score'))
     end
-  end
-
-  it 'contains a button for submitting the exercise' do
-    submission = build(:submission, contributor:, exercise:)
-    allow(submission).to receive(:calculate_score).and_return(scoring_response)
-    allow(Submission).to receive(:find).and_return(submission)
-    click_button(I18n.t('exercises.editor.score'))
-    expect(page).not_to have_content(I18n.t('exercises.editor.tooltips.exercise_deadline_passed'))
-    expect(page).to have_content(I18n.t('exercises.editor.submit'))
   end
 end

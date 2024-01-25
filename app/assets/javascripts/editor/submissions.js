@@ -1,6 +1,4 @@
 CodeOceanEditorSubmissions = {
-  FILENAME_URL_PLACEHOLDER: '{filename}',
-
   AUTOSAVE_INTERVAL: 15 * 1000,
   autosaveTimer: null,
   autosaveLabel: "#statusbar #autosave",
@@ -31,7 +29,7 @@ CodeOceanEditorSubmissions = {
       },
       dataType: 'json',
       method: $(initiator).data('http-method') || 'POST',
-      url: url + '.json'
+      url: url,
     });
     jqxhr.always(this.hideSpinner.bind(this));
     jqxhr.done(this.createSubmissionCallback.bind(this));
@@ -54,31 +52,22 @@ CodeOceanEditorSubmissions = {
     });
   },
 
-  createSubmissionCallback: function(data){
-    // set all frames context types to submission
-    $('.frame').each(function(index, element) {
-      $(element).data('context-type', 'Submission');
-    });
-
+  createSubmissionCallback: function(submission){
     // update the ids of the editors and reload the annotations
-    for (var i = 0; i < this.editors.length; i++) {
+    for (const editor of this.editors) {
 
-      // set the data attribute to submission
-      //$(editors[i].container).data('context-type', 'Submission');
-
-      var file_id_old = $(this.editors[i].container).data('file-id');
+      const file_id_old = $(editor.container).data('file-id');
 
       // file_id_old is always set. Either it is a reference to a teacher supplied given file, or it is the actual id of a new user created file.
       // This is the case, since it is set via a call to ancestor_id on the model, which returns either file_id if set, or id if it is not set.
       // therefore the else part is not needed any longer...
 
-      // if we have an file_id set (the file is a copy of a teacher supplied given file) and the new file-ids are present in the response
-      if (file_id_old != null && data.files){
+      // if we have an file_id set (the file is a copy of a teacher supplied given file) and the new file-ids are present in the submission
+      if (file_id_old != null && submission.files) {
         // if we find file_id_old (this is the reference to the base file) in the submission, this is the match
-        for(var j = 0; j< data.files.length; j++){
-          if(data.files[j].file_id === file_id_old){
-            //$(editors[i].container).data('id') = data.files[j].id;
-            $(this.editors[i].container).data('id', data.files[j].id );
+        for (const file of submission.files) {
+          if (file.file_id === file_id_old) {
+            $(editor.container).data('id', file.id);
           }
         }
       }
@@ -102,12 +91,10 @@ CodeOceanEditorSubmissions = {
 
   downloadCode: function(event) {
     event.preventDefault();
-    this.createSubmission('#download', null,function(response) {
-      var url = response.download_url;
-
+    this.createSubmission('#download', null,function(submission) {
       // to download just a single file, use the following url
-      //var url = response.download_file_url.replace(FILENAME_URL_PLACEHOLDER, active_file.filename);
-      window.location = url;
+      // window.location = Routes.download_file_submission_url(submission.id, CodeOceanEditor.active_file.filename);
+      window.location = Routes.download_submission_url(submission.id);
     });
   },
 
@@ -142,12 +129,12 @@ CodeOceanEditorSubmissions = {
     const cause = $('#render');
     this.startSentryTransaction(cause);
     event.preventDefault();
-    if ($('#render').is(':visible')) {
-      this.createSubmission(cause, null, function (response) {
-        if (response.render_url === undefined) return;
+    if (cause.is(':visible')) {
+      this.createSubmission(cause, null, function (submission) {
+        if (submission.render_url === undefined) return;
 
-        const active_file = CodeOceanEditor.active_file.filename.replace(/#$/,''); // remove # if it is the last character, this is not part of the filename and just an anchor
-        const desired_file = response.render_url.filter(hash => hash.filepath === active_file);
+        const active_file = CodeOceanEditor.active_file.filename;
+        const desired_file = submission.render_url.filter(hash => hash.filepath === active_file);
         const url = desired_file[0].url;
         // Allow to open the new tab even in Safari.
         // See: https://stackoverflow.com/a/70463940
@@ -159,7 +146,7 @@ CodeOceanEditorSubmissions = {
               this.printOutput({
                 stderr: message
               }, true, 0);
-              this.sendError(message, response.id);
+              this.sendError(message, submission.id);
               this.showOutputBar();
             };
           }
@@ -176,7 +163,7 @@ CodeOceanEditorSubmissions = {
     this.startSentryTransaction(cause);
     event.preventDefault();
     this.stopCode(event);
-    if ($('#run').is(':visible')) {
+    if (cause.is(':visible')) {
       this.createSubmission(cause, null, this.runSubmission.bind(this));
     }
   },
@@ -187,49 +174,20 @@ CodeOceanEditorSubmissions = {
     this.showSpinner($('#run'));
     $('#score_div').addClass('d-none');
     this.toggleButtonStates();
-    const url = submission.run_url.replace(this.FILENAME_URL_PLACEHOLDER, CodeOceanEditor.active_file.filename.replace(/#$/,'')); // remove # if it is the last character, this is not part of the filename and just an anchor
-    this.initializeSocketForRunning(url);
+    this.initializeSocketForRunning(submission.id, CodeOceanEditor.active_file.filename);
   },
 
   testCode: function(event) {
     const cause = $('#test');
     this.startSentryTransaction(cause);
     event.preventDefault();
-    if ($('#test').is(':visible')) {
-      this.createSubmission(cause, null, function(response) {
+    if (cause.is(':visible')) {
+      this.createSubmission(cause, null, function(submission) {
         this.showSpinner($('#test'));
         $('#score_div').addClass('d-none');
-        var url = response.test_url.replace(this.FILENAME_URL_PLACEHOLDER, CodeOceanEditor.active_file.filename.replace(/#$/,'')); // remove # if it is the last character, this is not part of the filename and just an anchor
-        this.initializeSocketForTesting(url);
+        this.initializeSocketForTesting(submission.id, CodeOceanEditor.active_file.filename);
       }.bind(this));
     }
-  },
-
-  submitCode: function(event) {
-    const button = $(event.target) || $('#submit');
-    this.startSentryTransaction(button);
-    this.teardownEventHandlers();
-    this.createSubmission(button, null, function (response) {
-      if (response.redirect) {
-        App.synchronized_editor?.disconnect();
-        this.autosaveIfChanged();
-        this.stopCode(event);
-        this.editors = [];
-        Turbolinks.clearCache();
-        Turbolinks.visit(response.redirect);
-      } else if (response.status === 'container_depleted') {
-        this.initializeEventHandlers();
-        this.showContainerDepletedMessage();
-      } else {
-        this.initializeEventHandlers();
-        for (let [type, text] of Object.entries(response)) {
-          $.flash[type]({
-            text: text,
-            showPermanent: true // We might display a very long text message!
-          })
-        }
-      }
-    })
   },
 
   /**

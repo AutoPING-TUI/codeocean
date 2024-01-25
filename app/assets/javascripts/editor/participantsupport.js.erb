@@ -19,13 +19,11 @@ CodeOceanEditorFlowr = {
     '</div>',
 
   getInsights: function () {
-    <% self.class.include Rails.application.routes.url_helpers %>
-    var flowrUrl = '<%= insights_path %>';
     var stackOverflowUrl = 'https://api.stackexchange.com/2.2/search/advanced';
 
     return jQuery.ajax({
       dataType: "json",
-      url: flowrUrl,
+      url: Routes.insights_path(),
       data: {}
     }).then(function (insights) {
       var stackoverflowRequests = _.map(insights, function (insight) {
@@ -94,7 +92,7 @@ CodeOceanEditorFlowr = {
         var body = resultTile.find('.card-body');
         body.html(result.body);
         body.append('<a target="_blank" href="' + questionUrl + '" class="btn btn-primary">' +
-          '<%= I18n.t('exercises.implement.flowr.go_to_question') %></a>');
+          `${I18n.t('exercises.implement.flowr.go_to_question')}</a>`);
         body.find('.btn').on('click', CodeOceanEditor.createEventHandler('editor_flowr_click_question', questionUrl));
 
         flowrHintBody.append(resultTile);
@@ -110,14 +108,15 @@ CodeOceanEditorFlowr = {
 CodeOceanEditorRequestForComments = {
   requestComments: function () {
     const cause = $('#requestComments');
+    const editor = $('#editor')
+    const questionElement = $('#question')
     this.startSentryTransaction(cause);
-    $('#question').prop("disabled", true);
+    questionElement.prop("disabled", true);
     $('#closeAskForCommentsButton').addClass('d-none');
 
-    var user_id = $('#editor').data('user-id');
-    var exercise_id = $('#editor').data('exercise-id');
+    var exercise_id = editor.data('exercise-id');
     var file_id = $('.editor').data('id');
-    var question = $('#question').val();
+    var question = questionElement.val();
 
     var createRequestForComments = function (submission) {
       this.showSpinner($('#askForCommentsButton'));

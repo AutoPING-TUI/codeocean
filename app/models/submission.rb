@@ -7,7 +7,6 @@ class Submission < ApplicationRecord
 
   CAUSES = %w[assess download file render run save submit test autosave requestComments remoteAssess
               remoteSubmit].freeze
-  FILENAME_URL_PLACEHOLDER = '{filename}'
   MAX_COMMENTS_ON_RECOMMENDED_RFC = 5
   OLDEST_RFC_TO_SHOW = 1.month
 
@@ -74,6 +73,10 @@ class Submission < ApplicationRecord
     collect_files.detect {|file| file.filepath == file_path }
   end
 
+  def full_score?
+    score == exercise.maximum_score
+  end
+
   def normalized_score
     @normalized_score ||= if !score.nil? && !exercise.maximum_score.nil? && exercise.maximum_score.positive?
                             score / exercise.maximum_score
@@ -123,7 +126,7 @@ class Submission < ApplicationRecord
   def redirect_to_feedback?
     # Redirect 10% of users to the exercise feedback page. Ensure, that always the same
     # users get redirected per exercise and different users for different exercises. If
-    # desired, the number of feedbacks can be limited with exercise.needs_more_feedback?(submission)
+    # desired, the number of feedbacks can be limited with exercise.needs_more_feedback?
     (contributor_id + exercise.created_at.to_i) % 10 == 1
   end
 
@@ -166,11 +169,11 @@ class Submission < ApplicationRecord
 
   # @raise [Runner::Error] if the code could not be run due to a failure with the runner.
   #                        See the specific type and message for more details.
-  def run(file, &)
+  def run(file, &block)
     run_command = command_for execution_environment.run_command, file.filepath
     durations = {}
     prepared_runner do |runner, waiting_duration|
-      durations[:execution_duration] = runner.attach_to_execution(run_command, &)
+      durations[:execution_duration] = runner.attach_to_execution(run_command, &block)
       durations[:waiting_duration] = waiting_duration
     rescue Runner::Error => e
       e.waiting_duration = waiting_duration
@@ -209,7 +212,7 @@ class Submission < ApplicationRecord
   private
 
   def build_files_hash(files, attribute)
-    files&.map(&attribute.to_proc)&.zip(files)&.to_h || {}
+    files&.map(&attribute.to_proc)&.zip(files).to_h
   end
 
   def prepared_runner
@@ -217,8 +220,16 @@ class Submission < ApplicationRecord
     begin
       runner = Runner.for(contributor, exercise.execution_environment)
       files = collect_files
-      files.reject!(&:reference_implementation?) if cause == 'run'
-      files.reject!(&:teacher_defined_assessment?) if cause == 'run'
+
+      case cause
+        when 'run'
+          files.reject!(&:reference_implementation?)
+          files.reject!(&:teacher_defined_assessment?)
+        when 'assess'
+          regular_filepaths = files.reject(&:reference_implementation?).map(&:filepath)
+          files.reject! {|file| file.reference_implementation? && regular_filepaths.include?(file.filepath) }
+      end
+
       Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Copying files to Runner #{runner.id} for #{contributor_type} #{contributor_id} and Submission #{id}." }
       runner.copy_files(files)
     rescue Runner::Error => e
@@ -257,7 +268,7 @@ class Submission < ApplicationRecord
   def score_file(output, file, requesting_user)
     assessor = Assessor.new(execution_environment:)
     assessment = assessor.assess(output)
-    passed = ((assessment[:passed] == assessment[:count]) and (assessment[:score]).positive?)
+    passed = (assessment[:passed] == assessment[:count]) and (assessment[:score]).positive?
     testrun_output = passed ? nil : "status: #{output[:status]}\n stdout: #{output[:stdout]}\n stderr: #{output[:stderr]}"
     if testrun_output.present?
       execution_environment.error_templates.each do |template|

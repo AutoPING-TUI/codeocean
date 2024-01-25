@@ -22,9 +22,13 @@ class Runner::Connection
   def initialize(url, strategy, event_loop, locale = I18n.locale)
     Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Opening connection to #{url}" }
 
-    sentry_transaction = Sentry.get_current_scope&.get_span
-    sentry_span = sentry_transaction&.start_child(op: SENTRY_OP_NAME, start_timestamp: Sentry.utc_now.to_f)
+    sentry_parent_transaction = Sentry.get_current_scope&.get_span
+    sentry_span = sentry_parent_transaction&.start_child(op: SENTRY_OP_NAME, start_timestamp: Sentry.utc_now.to_f)
+
+    # Set the span as the current span in the scope for correct trace headers.
+    Sentry.get_current_scope&.set_span(sentry_span) if sentry_span
     http_headers = strategy.class.websocket_header.deep_merge sentry_trace_header(sentry_span)
+    Sentry.get_current_scope&.set_span(sentry_parent_transaction) if sentry_parent_transaction
 
     @socket = Faye::WebSocket::Client.new(url, [], http_headers)
     @strategy = strategy
@@ -121,14 +125,14 @@ class Runner::Connection
     Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Receiving from #{@socket.url}: #{raw_event.data.inspect}" }
     event = decode(raw_event.data)
     unless BACKEND_OUTPUT_SCHEMA.valid?(event)
-      Sentry.capture_message('Received invalid JSON from runner management', extra: {event:})
+      Sentry.capture_message('Received invalid JSON from runner management', extra: {event:}) unless @strategy.instance_of?(Runner::Strategy::DockerContainerPool)
       return
     end
 
     event = event.deep_symbolize_keys
     message_type = event[:type].to_sym
     if WEBSOCKET_MESSAGE_TYPES.include?(message_type)
-      __send__("handle_#{message_type}", event)
+      __send__(:"handle_#{message_type}", event)
     else
       @error = Runner::Error::UnexpectedResponse.new("Unknown WebSocket message type: #{message_type}")
       close(:error)

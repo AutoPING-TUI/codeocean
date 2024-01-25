@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-FILENAME_REGEXP = /.+/ unless Kernel.const_defined?(:FILENAME_REGEXP)
-
 Rails.application.routes.draw do
   resources :community_solutions, only: %i[index edit update]
   resources :error_template_attributes
@@ -67,7 +65,7 @@ Rails.application.routes.draw do
       get :shell
       post 'shell', as: :execute_command, action: :execute_command
       get :list_files, as: :list_files_in
-      get 'download/:filename', as: :download_file_from, constraints: {filename: FILENAME_REGEXP}, action: :download_arbitrary_file, controller: 'live_streams'
+      get 'download/*filename', as: :download_file_from, action: :download_arbitrary_file, controller: 'live_streams', format: false # Admin file-system access to runners
       get :statistics
       post :sync_to_runner_management
     end
@@ -89,15 +87,15 @@ Rails.application.routes.draw do
       get :working_times
       post :intervention
       get :statistics
-      get :feedback
+      get :feedback, path: 'feedbacks'
       get :reload
-      post :submit
       get 'study_group_dashboard/:study_group_id', to: 'exercises#study_group_dashboard'
       post :export_external_check
       post :export_external_confirm
     end
 
     resources :programming_groups
+    resources :user_exercise_feedbacks, except: %i[show index], path: 'feedbacks'
   end
 
   resources :programming_groups, except: %i[new create]
@@ -119,10 +117,8 @@ Rails.application.routes.draw do
 
   resources :tips
 
-  resources :user_exercise_feedbacks, except: %i[show index]
-
   resources :external_users, only: %i[index show], concerns: :statistics do
-    resources :exercises do
+    resources :exercises, only: [] do
       get :statistics, to: 'exercises#external_user_statistics', on: :member
     end
     member do
@@ -133,8 +129,8 @@ Rails.application.routes.draw do
   namespace :code_ocean do
     resources :files, only: %i[create destroy]
   end
-  get '/uploads/files/:id/:filename', to: 'code_ocean/files#show_protected_upload', as: :protected_upload, constraints: {filename: FILENAME_REGEXP}
-  get '/uploads/render_files/:id/:filename', to: 'code_ocean/files#render_protected_upload', as: :render_protected_upload, constraints: {filename: FILENAME_REGEXP}
+  get '/uploads/files/:id/*filename', to: 'code_ocean/files#show_protected_upload', as: :protected_upload, format: false # View file, e.g., when implementing or viewing an exercise
+  get '/uploads/render_files/:id/*filename', to: 'code_ocean/files#render_protected_upload', as: :render_protected_upload, format: false # Render action with embedded files, i.e., images in user-created HTML
 
   resources :file_types
 
@@ -156,14 +152,15 @@ Rails.application.routes.draw do
 
   resources :submissions, only: %i[create index show] do
     member do
-      get 'download', as: :download, action: :download
-      get 'download/:filename', as: :download_file, constraints: {filename: FILENAME_REGEXP}, action: :download_file
-      get 'download_stream/:filename', as: :download_stream_file, constraints: {filename: FILENAME_REGEXP}, action: :download_submission_file, controller: 'live_streams'
-      get 'render/:filename', as: :render, constraints: {filename: FILENAME_REGEXP}, action: :render_file
-      get 'run/:filename', as: :run, constraints: {filename: FILENAME_REGEXP}, action: :run
+      get 'download', as: :download, action: :download # Full submission download with RemoteEvaluationMapping
+      get 'download/*filename', as: :download_file, action: :download_file, format: false # Single file download, currently not used in the frontend (but working)
+      get 'download_stream/*filename', as: :download_stream_file, action: :download_submission_file, controller: 'live_streams', format: false # Access runner artifacts
+      get 'render/*filename', as: :render, action: :render_file, format: false
+      get 'run/*filename', as: :run, action: :run, format: false
       get :score
       get :statistics
-      get 'test/:filename', as: :test, constraints: {filename: FILENAME_REGEXP}, action: :test
+      get 'test/*filename', as: :test, action: :test, format: false
+      get :finalize
     end
   end
 
