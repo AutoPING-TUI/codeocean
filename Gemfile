@@ -46,7 +46,7 @@ gem 'ransack'
 gem 'rubytree'
 gem 'rubyzip'
 gem 'sassc-rails'
-gem 'shakapacker', '7.2.2'
+gem 'shakapacker', '7.2.3'
 gem 'slim-rails'
 gem 'sorcery'
 gem 'sprockets-rails'
@@ -80,6 +80,7 @@ group :development, :staging do
   gem 'rubocop-performance'
   gem 'rubocop-rails', require: false
   gem 'rubocop-rspec'
+  gem 'slim_lint', require: false
 end
 
 group :test do

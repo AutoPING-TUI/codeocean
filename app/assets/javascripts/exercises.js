@@ -5,23 +5,17 @@ $(document).on('turbolinks:load', function () {
     var file_types;
     const editors = [];
 
-    var configureEditors = function () {
-        _.each(['modePath', 'themePath', 'workerPath'], function (attribute) {
-            ace.config.set(attribute, CodeOceanEditor.ACE_FILES_PATH);
-        });
-    };
-
     var initializeEditor = function (index, element) {
         var editor = ace.edit(element);
 
         var document = editor.getSession().getDocument();
-        // insert pre-existing code into editor. we have to use insertLines, otherwise the deltas are not properly added
+        // insert pre-existing code into editor. we have to use insertFullLines, otherwise the deltas are not properly added
         var file_id = $(element).data('file-id');
         var content = $('.editor-content[data-file-id=' + file_id + ']');
 
-        document.insertLines(0, content.text().split(/\n/));
+        document.insertFullLines(0, content.text().split(/\n/));
         // remove last (empty) that is there by default; disabled due to missing last line
-        // document.removeLines(document.getLength() - 1, document.getLength() - 1);
+        // document.removeFullLines(document.getLength() - 1, document.getLength() - 1);
         editor.setReadOnly($(element).data('read-only') !== undefined);
         editor.setShowPrintMargin(false);
         editor.setTheme(CodeOceanEditor.THEME);
@@ -231,7 +225,7 @@ $(document).on('turbolinks:load', function () {
         $('.remove-tip').on('click', removeTip);
 
         function addTip(id, title) {
-            const tip = {id: id, title: title}
+            const tip = {id: _.escape(id), title: _.escape(title)}
             const template =
                 '<div class="list-group-item d-block" data-tip-id=' + tip.id + ' data-id="">' +
                 '<span class="fa-solid fa-bars me-3"></span>' + tip.title +
@@ -487,7 +481,6 @@ $(document).on('turbolinks:load', function () {
     }
 
     if ($('#editor-edit').isPresent()) {
-        configureEditors();
         initializeEditors();
         $('.frame').show();
     }

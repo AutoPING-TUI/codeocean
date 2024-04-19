@@ -51,7 +51,7 @@ development:
   # Reference: https://webpack.js.org/configuration/dev-server/
   # Keys not described there are documented inline and in https://github.com/shakacode/shakapacker/
   dev_server:
-    https: false
+    server: http
     host: localhost
     port: 3035
     # Hot Module Replacement updates modules while the application is running without a full reload
@@ -83,7 +83,7 @@ development:
     pretty: true
     headers:
       'Access-Control-Allow-Origin': '*'
-      'Cache-Control': 'no-cache'
+      'Cache-Control': 'no-store'
     static:
       watch:
         ignored: '**/node_modules/**'
