@@ -1,3 +1,9 @@
+// Note: Directives are only processed if they come before any application code.
+// Once you have a line that does not include a comment or whitespace then Sprockets will stop looking for directives.
+// If you use a directive outside of the "header" of the document it will not do anything, and won't raise any errors.
+// <% config_file = CodeOcean::Config.new(:code_ocean, erb: false) %>
+//= depend_on <%= config_file.path.basename %>
+
 var CodeOceanEditor = {
     THEME: window.getCurrentTheme() === 'dark' ? 'ace/theme/tomorrow_night' : 'ace/theme/tomorrow',
 
@@ -27,15 +33,9 @@ var CodeOceanEditor = {
 
     lastCopyText: null,
 
-    <% self.class.include Rails.application.routes.url_helpers %>
-    <% @config ||= CodeOcean::Config.new(:code_ocean).read(erb: false) %>
-    // Important notice: Changing the config values requires any content-wise
-    // modification for this file in the development environment. Lacking to do so
-    // will result in the old, server-side cached serving of this file even across
-    // server restarts!
-    sendEvents: <%= @config['codeocean_events'] ? @config['codeocean_events']['enabled'] : false %>,
-    eventURL: "<%= @config['codeocean_events'] ? events_path : '' %>",
-    fileTypeURL: "<%= file_types_path %>",
+    sendEvents: <%= config_file.read['codeocean_events'] ? config_file.read['codeocean_events']['enabled'] : false %>,
+    eventURL: Routes.events_path(),
+    fileTypeURL: Routes.file_types_path(),
 
     confirmDestroy: function (event) {
         event.preventDefault();
@@ -572,9 +572,7 @@ var CodeOceanEditor = {
                     return map;
                 }, {});
 
-                for (const severity of severity_groups) {
-                    const linter_results = severity_groups[severity]
-
+                for (const [severity, linter_results] of Object.entries(severity_groups)) {
                     const li = document.createElement("li");
                     const text = $.parseHTML(`<u>${severity}:</u>`);
                     $(li).append(text);

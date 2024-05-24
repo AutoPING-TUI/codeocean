@@ -1,15 +1,15 @@
-h1 = RequestForComment.model_name.human(count: 2)
+h1 = RequestForComment.model_name.human(count: :other)
 
 = render(layout: 'shared/form_filters') do |f|
   .col-md-9.col
     .row.align-items-center
       - if params[:exercise_id].nil?
         .col-auto
-          = f.label(:exercise_title_cont, t('activerecord.attributes.request_for_comments.exercise'), class: 'visually-hidden form-label')
-          = f.search_field(:exercise_title_cont, class: 'form-control', placeholder: t('activerecord.attributes.request_for_comments.exercise'))
+          = f.label(:exercise_title_cont, RequestForComment.human_attribute_name('exercise'), class: 'visually-hidden form-label')
+          = f.search_field(:exercise_title_cont, class: 'form-control', placeholder: RequestForComment.human_attribute_name('exercise'))
       .col-auto.mt-3.mt-md-0
         = f.label(:title_cont, t('request_for_comments.solved'), class: 'visually-hidden form-label')
-        = f.select(:solved_not_eq, [[t('request_for_comments.show_all'), 2], [t('request_for_comments.show_unsolved'), 1], [t('request_for_comments.show_solved'), 0]])
+        = f.select(:state, [[t('request_for_comments.show_all'), RequestForComment::ALL], [t('request_for_comments.show_unsolved'), RequestForComment::ONGOING], [t('request_for_comments.show_soft_solved'), RequestForComment::SOFT_SOLVED], [t('request_for_comments.show_solved'), RequestForComment::SOLVED]])
     - unless current_user.consumer.rfc_visibility_study_group?
       .row
         .col
@@ -23,22 +23,22 @@ h1 = RequestForComment.model_name.human(count: 2)
       tr
         th
           i.fa-regular.fa-lightbulb aria-hidden='true' title = t('request_for_comments.solved') align='right'
-        th.sorttable_nosort = sort_link(@search, :title, t('activerecord.attributes.request_for_comments.exercise'))
-        th = t('activerecord.attributes.request_for_comments.question')
+        th.sorttable_nosort = sort_link(@search, :title, RequestForComment.human_attribute_name('exercise'))
+        th = RequestForComment.human_attribute_name('question')
         th
           i.fa-solid.fa-comment aria-hidden='true' title = t('request_for_comments.comments') align='center'
-        th = t('activerecord.attributes.request_for_comments.username')
-        th = t('activerecord.attributes.request_for_comments.requested_at')
-        th = t('activerecord.attributes.request_for_comments.last_update')
+        th = RequestForComment.human_attribute_name('username')
+        th = RequestForComment.human_attribute_name('requested_at')
+        th = RequestForComment.human_attribute_name('last_update')
     tbody
       - @request_for_comments.each do |request_for_comment|
         tr data-id=request_for_comment.id
           - if request_for_comment.solved?
             td
-              span.fa-solid.fa-check aria-hidden='true'
-          - elsif request_for_comment.full_score_reached
+              span.fa-solid.fa-check.text-success aria-hidden='true'
+          - elsif request_for_comment.full_score_reached?
             td
-              span.fa-solid.fa-check.text-secondary-emphasis aria-hidden='true'
+              span.fa-solid.fa-check.text-body-tertiary aria-hidden='true'
           - else
             td = ''
           td = link_to_if(policy(request_for_comment).show?, request_for_comment.submission.exercise.title, request_for_comment)

@@ -1,0 +1,13 @@
+---
+en:
+  activerecord:
+    attributes:
+      tip:
+        description: Description
+        example: Example
+        file_type: File Type
+        title: Title
+    models:
+      tip:
+        one: Tip
+        other: Tips

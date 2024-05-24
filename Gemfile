@@ -32,9 +32,8 @@ gem 'net-imap', require: false
 gem 'net-pop', require: false
 gem 'net-smtp', require: false
 gem 'nokogiri'
-gem 'pagedown-bootstrap-rails'
 gem 'pg'
-gem 'proformaxml', '~> 1.2.0'
+gem 'proformaxml', '~> 1.3.0'
 gem 'prometheus_exporter'
 gem 'puma'
 gem 'pundit'
@@ -46,7 +45,7 @@ gem 'ransack'
 gem 'rubytree'
 gem 'rubyzip'
 gem 'sassc-rails'
-gem 'shakapacker', '7.2.3'
+gem 'shakapacker', '8.0.0'
 gem 'slim-rails'
 gem 'sorcery'
 gem 'sprockets-rails'
@@ -70,6 +69,7 @@ end
 group :development, :staging do
   gem 'better_errors'
   gem 'binding_of_caller'
+  gem 'i18n-tasks'
   gem 'letter_opener'
   gem 'listen'
   gem 'pry-byebug'

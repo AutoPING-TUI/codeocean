@@ -104,11 +104,11 @@ namespace :detect_exercise_anomalies do
   def get_contributor_working_times(exercise)
     unless WORKING_TIME_CACHE.key?(exercise.id)
       exercise.retrieve_working_time_statistics
-      WORKING_TIME_CACHE[exercise.id] = exercise.working_time_statistics.filter_map do |contributor_type, contributor_id_with_result|
+      WORKING_TIME_CACHE[exercise.id] = exercise.working_time_statistics.flat_map do |contributor_type, contributor_id_with_result|
         contributor_id_with_result.flat_map do |contributor_id, result|
-          [[contributor_type, contributor_id], result]
-        end.presence
-      end.to_h
+          {[contributor_type, contributor_id] => result}
+        end
+      end.inject(:merge)
     end
     WORKING_TIME_CACHE[exercise.id]
   end
@@ -153,8 +153,10 @@ namespace :detect_exercise_anomalies do
         users = contributor.try(:users) || [contributor]
         users.each do |user|
           host = CodeOcean::Application.config.action_mailer.default_url_options[:host]
+          last_submission = user.submissions.where(exercise:).latest
+          token = AuthenticationToken.generate!(user, last_submission.study_group).shared_secret
           feedback_link = Rails.application.routes.url_helpers.url_for(action: :new,
-            controller: :user_exercise_feedbacks, exercise_id: exercise.id, host:)
+            controller: :user_exercise_feedbacks, exercise_id: exercise.id, host:, token:)
           UserMailer.exercise_anomaly_needs_feedback(user, exercise, feedback_link).deliver
         end
       end
