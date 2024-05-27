@@ -27,22 +27,15 @@ $(document).on('turbolinks:load', function() {
 
 function submitCode(event) {
     const button = $(event.target) || $('#submit');
-    this.startSentryTransaction(button);
-    this.teardownEventHandlers();
-    this.createSubmission(button, null, function (response) {
-        if (response.redirect) {
-            this.autosaveIfChanged();
-            this.stopCode(event);
-            this.editors = [];
-            Turbolinks.clearCache();
-            Turbolinks.visit(response.redirect);
-        } else if (response.status === 'container_depleted') {
-            this.showContainerDepletedMessage();
-        } else if (response.message) {
-            $.flash.danger({
-                text: response.message
-            });
-        }
-        this.initializeEventHandlers();
-    })
+    this.newSentryTransaction(button, async () => {
+        const submission = await this.createSubmission(button, null).catch(this.ajaxError.bind(this));
+        if (!submission) return;
+        if (!submission.redirect) return;
+
+        this.autosaveIfChanged();
+        this.stopCode(event);
+        this.editors = [];
+        Turbolinks.clearCache();
+        Turbolinks.visit(submission.redirect);
+    });
 }

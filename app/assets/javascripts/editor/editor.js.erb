@@ -202,15 +202,25 @@ var CodeOceanEditor = {
         $('button i.fa-spin').removeClass('d-inline-block').addClass('d-none');
     },
 
-    startSentryTransaction: function (initiator) {
-        const cause = initiator.data('cause') || initiator.prop('id');
-        this.sentryTransaction = window.SentryUtils.startIdleTransaction(
-          Sentry.getCurrentHub(),
-          { name: cause, op: "transaction" },
-          0, // Idle Timeout
-          window.SentryUtils.TRACING_DEFAULTS.finalTimeout,
-          true); // onContext
-        Sentry.getCurrentHub().configureScope(scope => scope.setSpan(this.sentryTransaction));
+    newSentryTransaction: function (initiator, callback) {
+        // based on Sentry recommendation.
+        // See https://github.com/getsentry/sentry-javascript/issues/12116
+        return Sentry.continueTrace({ sentryTrace: '', baggage: '' }, () => {
+            // inside of this we have a new trace!
+            return Sentry.withActiveSpan(null, () => {
+                // inside of this there is no parent span, no matter what!
+                const cause = initiator.data('cause') || initiator.prop('id');
+                return Sentry.startSpan({name: cause, op: "transaction", forceTransaction: true}, async () => {
+                    // Execute the desired custom code
+                    try {
+                        return await callback();
+                    } catch (error) {
+                        console.error(JSON.stringify(error));
+                        Sentry.captureException(JSON.stringify(error), {mechanism: {handled: false}});
+                    }
+                });
+            });
+        });
     },
 
     resizeAceEditors: function (own_solution = false) {
@@ -894,12 +904,14 @@ var CodeOceanEditor = {
         Sentry.captureException(JSON.stringify(error, ["message", "arguments", "type", "name", "data"]));
     },
 
-    showFileDialog: function (event) {
+    showFileDialog: async function (event) {
         event.preventDefault();
-        this.createSubmission('#create-file', null, function (response) {
-            $('#code_ocean_file_context_id').val(response.id);
-            new bootstrap.Modal($('#modal-file')).show();
-        }.bind(this));
+
+        const submission = await this.createSubmission('#create-file', null).catch(this.ajaxError.bind(this));
+        if (!submission) return;
+
+        $('#code_ocean_file_context_id').val(submission.id);
+        new bootstrap.Modal($('#modal-file')).show();
     },
 
     initializeOutputBarToggle: function () {
