@@ -18,7 +18,7 @@ class ExercisePolicy < AdminOrAuthorPolicy
   end
 
   def detailed_statistics?
-    admin?
+    admin? || teacher_in_study_group?
   end
 
   %i[clone? destroy? edit? update?].each do |action|
