@@ -100,7 +100,7 @@ class SubmissionsController < ApplicationController
       url = render_protected_upload_url(id: @file.id, filename: @file.filepath)
       redirect_to AuthenticatedUrlHelper.sign(url, @file)
     else
-      response.set_header('Content-Length', @file.size)
+      #response.set_header('Content-Length', @file.size)
       send_data(@file.content, filename: @file.name_with_extension, disposition: 'inline')
     end
   end
