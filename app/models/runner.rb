@@ -19,13 +19,13 @@ class Runner < ApplicationRecord
   end
 
   def self.management_active?
-    @management_active ||= begin
-      runner_management = CodeOcean::Config.new(:code_ocean).read[:runner_management]
-      if runner_management
-        runner_management[:enabled]
-      else
-        false
-      end
+    return @management_active if defined? @management_active
+
+    runner_management = CodeOcean::Config.new(:code_ocean).read[:runner_management]
+    if runner_management
+      @management_active = runner_management[:enabled]
+    else
+      @management_active = false
     end
   end
 
@@ -46,7 +46,8 @@ class Runner < ApplicationRecord
   def copy_files(files)
     reserve!
     @strategy.copy_files(files)
-  rescue Runner::Error::RunnerNotFound
+  rescue Runner::Error => e
+    Sentry.capture_exception(e) unless e.is_a? Runner::Error::RunnerNotFound
     request_new_id
     save
     @strategy.copy_files(files)
@@ -57,6 +58,7 @@ class Runner < ApplicationRecord
   def download_file(desired_file, privileged_execution:, exclusive: true, &)
     reserve! if exclusive
     @strategy.download_file(desired_file, privileged_execution:, &)
+  ensure
     release! if exclusive
   end
 
@@ -85,7 +87,6 @@ class Runner < ApplicationRecord
 
       # Otherwise, we return an hash with empty files and release the runner
       release! if exclusive
-      {'files' => []}
     end
   end
 
@@ -108,9 +109,10 @@ class Runner < ApplicationRecord
       e.execution_duration = Time.zone.now - starting_time
       raise
     end
-    release! if exclusive
     Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Stopped execution with Runner #{id} for #{contributor_type} #{contributor_id}." }
     Time.zone.now - starting_time # execution duration
+  ensure
+    release! if exclusive
   end
 
   def execute_command(command, privileged_execution: false, raise_exception: true, exclusive: true)

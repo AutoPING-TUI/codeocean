@@ -8,15 +8,14 @@ RSpec.describe 'seeds' do
   before do
     Rails.application.load_tasks if Rake::Task.tasks.empty?
 
-    # We need to migrate the test database before seeding
+    # We need to prepare the test database before seeding
     # Otherwise, Rails 7.1+ will throw an `NoMethodError`: `pending_migrations.any?`
     # See ActiveRecord gem, file `lib/active_record/railties/databases.rake`
-    Rake::Task['db:migrate'].invoke
+    Rake::Task['db:prepare'].invoke
 
     # We want to execute the seeds for the dev environment against the test database
-    # rubocop:disable Rails/Inquiry
-    allow(Rails).to receive(:env) { 'development'.inquiry }
-    # rubocop:enable Rails/Inquiry
+    allow(Rails).to receive(:env) { 'development'.inquiry } # rubocop:disable Rails/Inquiry
+    allow(Rails.application.config.action_mailer).to receive(:default_url_options).and_return({})
     allow(ActiveRecord::Base).to receive(:establish_connection).and_call_original
     allow(ActiveRecord::Base).to receive(:establish_connection).with(:development) {
       ActiveRecord::Base.establish_connection(:test)
@@ -28,7 +27,7 @@ RSpec.describe 'seeds' do
     allow(HighLine).to receive(:say)
   end
 
-  describe 'execute db:seed', cleaning_strategy: :truncation do
+  describe 'execute db:seed' do
     it 'collects the test results' do
       expect { seed }.not_to raise_error
     end

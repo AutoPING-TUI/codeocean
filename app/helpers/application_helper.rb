@@ -7,6 +7,10 @@ module ApplicationHelper
     APPLICATION_NAME
   end
 
+  def clear_content_for(name)
+    view_flow.content.delete(name)
+  end
+
   def code_tag(code, language = nil)
     if code.present?
       tag.pre do
@@ -50,7 +54,13 @@ module ApplicationHelper
   end
 
   def render_markdown(markdown)
-    ActionController::Base.helpers.sanitize Kramdown::Document.new(markdown, input: 'GFM', hard_wrap: false, smart_quotes: 'apos,apos,quot,quot').to_html.strip
+    ActionController::Base.helpers.sanitize Kramdown::Document.new(
+      markdown,
+      input: 'GFM',
+      hard_wrap: false,
+      smart_quotes: 'apos,apos,quot,quot',
+      footnote_backlink: nil
+    ).to_html.strip
   end
 
   def row(options = {}, &block)

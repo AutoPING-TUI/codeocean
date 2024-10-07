@@ -1,8 +1,8 @@
 h1
-  => @exercise
-  ' (external user
-  = link_to_if(policy(@external_user).show?, @external_user.displayname, @external_user)
-  ' )
+  = t('.title_html',
+        exercise: @exercise,
+        user_class: @external_user.class.model_name.human,
+        user: link_to_if(policy(@external_user).show?, @external_user.displayname, @external_user))
 - submissions = @all_events.filter {|event| event.is_a? Submission }
 - current_submission = submissions.first
 - if current_submission
@@ -13,7 +13,7 @@ h1
       - file_types.add(ActiveSupport::JSON.encode(file.file_type))
     - all_files.push(submission.files)
   - all_files.compact_blank!
-  - file_types.reject!(&:blank?) # rubocop:disable Rails/CompactBlank because it's a set
+  - file_types.reject!(&:blank?)
 
   .d-none#data data-submissions=ActiveSupport::JSON.encode(submissions) data-files=ActiveSupport::JSON.encode(all_files) data-file-types=ActiveSupport::JSON.encode(file_types)
 
@@ -79,13 +79,13 @@ h1
                       .unit-test-result.positive-result title=[run.file&.filepath, run.log].join("\n").strip
                     - else
                       .unit-test-result.unknown-result title=[run.file&.filepath, run.log].join("\n").strip
-                td = @working_times_until[event_index] if event_index.positive? && policy(@exercise).detailed_statistics?
+                td = @working_times_until[event_index] if policy(@exercise).detailed_statistics?
               - elsif this.is_a? UserExerciseIntervention
                 td = this.created_at.strftime('%F %T')
                 td = this.intervention.name
                 td
                 td
-                td = @working_times_until[event_index] if event_index.positive? && policy(@exercise).detailed_statistics?
+                td = @working_times_until[event_index] if policy(@exercise).detailed_statistics?
     small
       b
         = t('.legend')

@@ -66,7 +66,9 @@ const envConfig = module.exports = {
     },
     plugins: [
         new CompressionPlugin(),
-        new MiniCssExtractPlugin(),
+        new MiniCssExtractPlugin({
+            filename: '[name]-[contenthash].css',
+        }),
         new SubresourceIntegrityPlugin(),
         new WebpackAssetsManifest({
             entrypoints: true,
@@ -88,6 +90,16 @@ const envConfig = module.exports = {
     stats: 'minimal',
 }
 
+// Enable working source maps in development mode, overwriting the default 'cheap-module-source-map'.
+if (webpackConfig.mode === 'development') {
+    envConfig.devtool = 'source-map';
+}
+
+// Enable source map for SASS / SCSS files, including the original sources in the source map.
+webpackConfig.module.rules
+  .flatMap(rule => Array.isArray(rule.use) ? rule.use : [])
+  .filter(loaderConfig => loaderConfig.options?.sassOptions)
+  .forEach(loaderConfig => loaderConfig.options.sassOptions.sourceMapIncludeSources = true);
 
 // Use the following lines below to remove original plugins and replace them with our custom config.
 // This is especially needed for the `WebpackAssetsManifest` plugin, which would otherwise run twice.

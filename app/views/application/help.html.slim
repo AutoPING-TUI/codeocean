@@ -5,10 +5,10 @@
   h2 = t('shared.help.execution_environment_specific_help', execution_environment:)
   = render_markdown(execution_environment.help)
 
-- content_for :modal_footer do
+- content_for :modal_footer, flush: true do
   - if ApplicationController::LEGAL_SETTINGS.present?
     ul.horizontal.dash.pull-start
       - ApplicationController::LEGAL_SETTINGS.each do |name, link|
         li
           / i18n-tasks-use t('shared.help.privacy_policy') t('shared.help.imprint')
-          = link_to(t("shared.help.#{name.delete_suffix('_url')}"), link, target: '_blank', rel: 'noopener')
+          = link_to(t("shared.help.#{name.delete_suffix('_url')}"), link, target: '_blank', rel: 'noopener noreferrer')

@@ -19,13 +19,16 @@ jobs:
           --health-retries 5
 
     steps:
+      - name: Install packages
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y google-chrome-stable curl libjemalloc2 libvips postgresql-client
+
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.3
+          ruby-version: .ruby-version
           bundler-cache: true
 
       - name: Setup Node
@@ -59,15 +62,14 @@ jobs:
           cp config/action_mailer.yml.ci config/action_mailer.yml
           cp config/code_ocean.yml.ci config/code_ocean.yml
           cp config/database.yml.ci config/database.yml
-          cp config/secrets.yml.ci config/secrets.yml
           cp config/docker.yml.erb.ci config/docker.yml.erb
           cp config/mnemosyne.yml.ci config/mnemosyne.yml
           cp config/content_security_policy.yml.ci config/content_security_policy.yml
 
-      - name: Create database
+      - name: Prepare database
         env:
           RAILS_ENV: test
-        run: bundler exec rake db:schema:load
+        run: bundler exec rake db:prepare
       - name: Precompile assets
         env:
           RAILS_ENV: test
@@ -84,6 +86,14 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
+      - name: Keep screenshots from failed system specs
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: screenshots
+          path: ${{ github.workspace }}/tmp/screenshots
+          if-no-files-found: ignore
+
   lint:
     runs-on: ubuntu-latest
 
@@ -94,7 +104,7 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.3
+          ruby-version: .ruby-version
           bundler-cache: true
 
       - name: Run rubocop
@@ -125,17 +135,39 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.3
+          ruby-version: .ruby-version
           bundler-cache: true
 
       - name: Run slim-lint
         run: bundle exec slim-lint app/views --reporter checkstyle > checkstyle-result.xml
 
       - name: Upload slim-lint results as GitHub annotations
-        uses: lcollins/checkstyle-github-action@v3.0.0
+        uses: lcollins/checkstyle-github-action@v3.1.0
         # Only create GitHub annotations for the main repo (disable for forks):
-        if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        if: ${{ always() && github.event.pull_request.head.repo.full_name == github.repository }}
         with:
           name: Slim-Lint Report
           title: Analyze Slim templates for linting issues
           path: checkstyle-result.xml
+
+  scan_ruby:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: .ruby-version
+          bundler-cache: true
+
+      - name: Scan for common Rails security vulnerabilities using static analysis
+        uses: reviewdog/action-brakeman@v2
+        with:
+          filter_mode: nofilter
+          reporter: github-check
+          skip_install: true
+          use_bundler: true
+          fail_on_error: true

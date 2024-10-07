@@ -4,8 +4,8 @@ class SessionsController < ApplicationController
   include Lti
 
   %i[require_oauth_parameters require_valid_consumer_key require_valid_oauth_signature require_unique_oauth_nonce
-     require_valid_lis_outcome_service_url set_current_user require_valid_exercise_token set_study_group_membership
-     set_embedding_options].each do |method_name|
+     require_valid_launch_presentation_return_url require_valid_lis_outcome_service_url set_current_user require_valid_exercise_token
+     set_study_group_membership set_embedding_options].each do |method_name|
     before_action(method_name, only: :create_through_lti)
   end
 
@@ -86,7 +86,7 @@ class SessionsController < ApplicationController
         lti_parameters = params.slice(*Lti::SESSION_PARAMETERS).permit!.to_h
         provider = build_tool_provider(consumer: current_user.consumer, parameters: lti_parameters)
         provider.post_replace_result!(1.0)
-      rescue IMS::LTI::InvalidLTIConfigError, IMS::LTI::XMLParseError, Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNRESET, SocketError, EOFError
+      rescue IMS::LTI::InvalidLTIConfigError, IMS::LTI::XMLParseError, Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNREFUSED, Errno::ECONNRESET, SocketError, EOFError
         # We don't do anything here because it is only a bonus point and we want the users to do the survey
       end
     end

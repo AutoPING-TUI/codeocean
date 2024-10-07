@@ -10,7 +10,7 @@ class ProxyExercisePolicy < AdminOrAuthorPolicy
   end
 
   %i[clone? destroy? edit? update?].each do |action|
-    define_method(action) { admin? || author? }
+    define_method(action) { admin? || author? || teacher_in_study_group? }
   end
 
   class Scope < Scope
@@ -23,7 +23,7 @@ class ProxyExercisePolicy < AdminOrAuthorPolicy
           # The proxy_exercise's author is a teacher in the study group
           .where(study_group_memberships: {role: StudyGroupMembership.roles[:teacher]})
           # The current user is a teacher in the *same* study group
-          .where(study_group_memberships: {study_group_id: @user.study_group_memberships.where(role: :teacher).select(:study_group_id)})
+          .where(study_group_memberships: {study_group_id: @user.study_group_ids_as_teacher})
           .or(@scope.distinct.where(user: @user))
           .or(@scope.distinct.where(public: true))
       else

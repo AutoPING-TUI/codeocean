@@ -27,31 +27,25 @@ class User < Contributor
   has_one :codeharbor_link, dependent: :destroy
   accepts_nested_attributes_for :user_proxy_exercise_exercises
 
-  scope :in_study_group_of, lambda {|user|
-                              unless user.admin?
-                                joins(:study_group_memberships)
-                                  .where(study_group_memberships: {
-                                    study_group_id: user.study_group_memberships
-                                                        .where(study_group_memberships: {role: StudyGroupMembership.roles[:teacher]})
-                                                        .select(:study_group_id),
-                                  })
-                              end
-                            }
-
   validates :platform_admin, inclusion: [true, false]
 
   def learner?
     return true if current_study_group_id.nil?
+    return @learner if defined? @learner
 
-    @learner ||= current_study_group_membership.exists?(role: :learner) && !platform_admin?
+    @learner = current_study_group_membership.exists?(role: :learner) && !platform_admin?
   end
 
   def teacher?
-    @teacher ||= current_study_group_membership.exists?(role: :teacher) && !platform_admin?
+    return @teacher if defined? @teacher
+
+    @teacher = current_study_group_membership.exists?(role: :teacher) && !platform_admin?
   end
 
   def admin?
-    @admin ||= platform_admin?
+    return @admin if defined? @admin
+
+    @admin = platform_admin?
   end
 
   def id_with_type
@@ -68,6 +62,14 @@ class User < Contributor
     study_group_memberships.where(study_group: current_study_group_id).limit(1)
   end
 
+  def study_group_ids_as_teacher
+    @study_group_ids_as_teacher ||= study_group_memberships.where(role: :teacher).pluck(:study_group_id)
+  end
+
+  def study_group_ids_as_learner
+    @study_group_ids_as_learner ||= study_group_memberships.where(role: :learner).pluck(:study_group_id)
+  end
+
   def self.find_by_id_with_type(id_with_type)
     if id_with_type[0].casecmp('e').zero?
       ExternalUser.find(id_with_type[1..])
@@ -82,7 +84,7 @@ class User < Contributor
     if auth_object.present? && auth_object.admin?
       %w[name email external_id consumer_id platform_admin id]
     else
-      %w[name external_id id]
+      %w[name external_id consumer_id id]
     end
   end
 end

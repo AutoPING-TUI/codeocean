@@ -35,9 +35,6 @@ class Exercise < ApplicationRecord
   has_many :pair_programming_waiting_users
   has_many :request_for_comments
 
-  scope :with_submissions, -> { where('id IN (SELECT exercise_id FROM submissions)') }
-  scope :with_programming_groups, -> { where('id IN (SELECT exercise_id FROM programming_groups)') }
-
   validate :valid_main_file?
   validate :valid_submission_deadlines?
   validates :description, presence: true
@@ -408,7 +405,7 @@ class Exercise < ApplicationRecord
   end
 
   def accumulated_working_time_for_only(contributor)
-    contributor_type = contributor.class.name
+    submission_filter = {id:, contributor_id: contributor.id, contributor_type: contributor.class.name}
     begin
       result = self.class.connection.exec_query("
               WITH WORKING_TIME AS
@@ -419,7 +416,7 @@ class Exercise < ApplicationRecord
                                  (created_at - lag(created_at) OVER (PARTITION BY contributor_id, exercise_id
                                                                      ORDER BY created_at)) AS working_time
                          FROM submissions
-                         WHERE exercise_id = #{id} AND contributor_id = #{contributor.id} AND contributor_type = '#{contributor_type}'
+                         WHERE #{self.class.sanitize_sql(['exercise_id = :id AND contributor_id = :contributor_id AND contributor_type = :contributor_type', submission_filter])}
                          GROUP BY contributor_id, id, exercise_id),
               MAX_POINTS AS
               (SELECT context_id AS ex_id, sum(weight) AS max_points FROM files WHERE context_type = 'Exercise' AND context_id = #{id} AND role IN ('teacher_defined_test', 'teacher_defined_linter') GROUP BY context_id),

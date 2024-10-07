@@ -12,6 +12,7 @@ en:
     apply_filters: Apply filters
     back: Back
     batch_update: Batch Update
+    close: Close
     color_mode:
       auto: Auto
       dark: Dark
@@ -51,4 +52,4 @@ en:
       shortcut: 'Keyboard shortcut: %{shortcut}'
     update: Update %{model}
     upload_file: Upload file
-    websocket_failure: Sorry, a connection issue occurred. <a href="https://websocketstest.com" target="_blank" rel="noopener" class="alert-link">Please check WebSocket connections with this tool</a> and try again.
+    websocket_failure: Sorry, a connection issue occurred. <a href="https://websocketstest.com" target="_blank" rel="noopener noreferrer" class="alert-link">Please check WebSocket connections with this tool</a> and try again.

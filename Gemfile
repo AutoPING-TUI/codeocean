@@ -2,7 +2,6 @@
 
 source 'https://rubygems.org'
 
-gem 'actioncable-enhanced-postgresql-adapter'
 gem 'bcrypt'
 gem 'bootsnap', require: false
 gem 'bootstrap-will_paginate'
@@ -33,11 +32,11 @@ gem 'net-pop', require: false
 gem 'net-smtp', require: false
 gem 'nokogiri'
 gem 'pg'
-gem 'proformaxml', '~> 1.3.0'
+gem 'proformaxml', '~> 1.5.1'
 gem 'prometheus_exporter'
 gem 'puma'
 gem 'pundit'
-gem 'rails', '~> 7.1.3'
+gem 'rails', '~> 7.2.1'
 gem 'rails_admin'
 gem 'rails-i18n'
 gem 'rails-timeago'
@@ -45,12 +44,14 @@ gem 'ransack'
 gem 'rubytree'
 gem 'rubyzip'
 gem 'sassc-rails'
-gem 'shakapacker', '8.0.0'
+gem 'shakapacker', '8.0.2'
 gem 'slim-rails'
+gem 'solid_cable'
+gem 'solid_queue'
 gem 'sorcery'
 gem 'sprockets-rails'
 gem 'telegraf'
-gem 'terser'
+gem 'terser', require: false
 gem 'tubesock'
 gem 'turbolinks'
 gem 'whenever', require: false
@@ -69,24 +70,25 @@ end
 group :development, :staging do
   gem 'better_errors'
   gem 'binding_of_caller'
+  gem 'brakeman'
   gem 'i18n-tasks'
   gem 'letter_opener'
   gem 'listen'
   gem 'pry-byebug'
   gem 'pry-rails'
   gem 'rack-mini-profiler'
-  gem 'rubocop', require: false
+  gem 'rubocop'
   gem 'rubocop-capybara'
+  gem 'rubocop-factory_bot'
   gem 'rubocop-performance'
-  gem 'rubocop-rails', require: false
+  gem 'rubocop-rails'
   gem 'rubocop-rspec'
+  gem 'rubocop-rspec_rails'
   gem 'slim_lint', require: false
 end
 
 group :test do
   gem 'capybara'
-  gem 'database_cleaner'
-  gem 'headless'
   gem 'rails-controller-testing'
   gem 'rspec-collection_matchers'
   gem 'rspec-github', require: false
