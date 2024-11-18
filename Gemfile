@@ -56,6 +56,7 @@ gem 'tubesock', github: 'openhpi/tubesock'
 gem 'turbolinks'
 gem 'whenever', require: false
 gem 'zxcvbn-ruby', require: 'zxcvbn'
+gem 'showdown-rails'
 
 # Error Tracing
 gem 'mnemosyne-ruby'
@@ -98,3 +99,5 @@ group :test do
   gem 'simplecov', require: false
   gem 'webmock'
 end
+
+gem "bootstrap", "~> 5.2"

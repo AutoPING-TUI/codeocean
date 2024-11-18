@@ -109,4 +109,38 @@ RSpec.describe 'Editor', :js do
       expect(page).to have_no_content(I18n.t('exercises.editor.score'))
     end
   end
+
+  it 'contains a button for submitting the exercise' do
+    submission = build(:submission, user:, exercise:)
+    allow(submission).to receive(:calculate_score).and_return(scoring_response)
+    allow(Submission).to receive(:find).and_return(submission)
+    click_button(I18n.t('exercises.editor.score'))
+    expect(page).not_to have_content(I18n.t('exercises.editor.tooltips.exercise_deadline_passed'))
+    expect(page).to have_content(I18n.t('exercises.editor.submit'))
+  end
+
+  it 'contains a button for darkmode' do
+    visit(implement_exercise_path(exercise))
+    expect(page).to have_css('body[data-bs-theme="light"]')
+    find('#theme-toggle').click
+    expect(page).to have_css('body[data-bs-theme="dark"]')
+    sleep(3)
+    find('#theme-toggle').click
+    expect(page).to have_css('body[data-bs-theme="light"]')
+  end
+
+  context 'contains resizer' do
+    it 'contains a horizontal resizer' do
+      visit(implement_exercise_path(exercise))
+      expect(page).to have_css('#resizerHorizontal')
+    end
+    it 'contains a vertical resizer' do
+      visit(implement_exercise_path(exercise))
+      click_button(I18n.t('exercises.editor.score'))
+      expect(page).to have_css('#resizerVertical')
+    end
+  end
+
+
+
 end

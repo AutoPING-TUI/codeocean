@@ -241,6 +241,10 @@ var CodeOceanEditor = {
         $('#content-right-sidebar').height(this.calculateEditorHeight('#content-right-sidebar', false));
     },
 
+    resizeHorizontalResizer: function () {
+        $('#resizerHorizontal').height(this.calculateEditorHeight('#resizerHorizontal', false));
+    },
+
     calculateEditorHeight: function (element, considerStatusbar) {
         const jqueryElement = $(element);
         if (jqueryElement.length === 0) {
@@ -462,6 +466,16 @@ var CodeOceanEditor = {
         }
         $('#sidebar-collapsed').toggleClass('d-none');
         $('#sidebar-uncollapsed').toggleClass('d-none');
+        if ($('#sidebar-uncollapsed').hasClass('d-none')) {
+            if ($(window).width() >= 992) {
+                $('#panel-left').css('width', $('#sidebar-collapsed').outerWidth(true));
+            }
+            $('#panel-left').css('padding-bottom', '4px');
+        } else {
+            $('#panel-left').css('width', '');
+            $('#panel-left').css('padding-bottom', '');
+        }
+        $('#resizerHorizontal').toggleClass('d-lg-block');
     },
 
     initializeRegexes: function () {
@@ -495,7 +509,8 @@ var CodeOceanEditor = {
         button.prop('disabled', true);
         button.on('click', function () {
             button.tooltip('hide');
-            $('#rfc_intervention_text').hide()
+            $('#rfc_intervention_text').hide();
+            $('.modal-footer').hide();
             new bootstrap.Modal($('#comment-modal')).show();
         });
 
@@ -541,8 +556,15 @@ var CodeOceanEditor = {
     },
 
     populateCard: function (card, result, index) {
-        card.addClass(`card border-${this.getCardClass(result)}`);
-        card.find('.card-header').addClass(`bg-${this.getCardClass(result)} text-white`);
+        if (result.stderr && !result.score || result.score < 1) {
+            card.find('.card-body').toggleClass('d-none');
+            card.find('i').toggleClass('fa-chevron-down fa-chevron-right')
+        }
+        card.find('.card-header').on('click', ()=>{
+            card.find('.card-body').toggleClass('d-none');
+            card.find('i').toggleClass('fa-chevron-down fa-chevron-right')
+        });
+        card.addClass(this.getCardClass(result));
         card.find('.card-title .filename').text(result.filename);
         card.find('.card-title .number').text(index + 1);
         card.find('.row .col-md-9').eq(0).find('.number').eq(0).text(result.passed);
@@ -609,9 +631,10 @@ var CodeOceanEditor = {
             // Just show standard results for normal test results
             } else {
               errorMessagesToShow.forEach(function (item) {
+                  var converter = new showdown.Converter();
+                  var html = converter.makeHtml(item)
                   var li = document.createElement("li");
-                  var text = document.createTextNode(item);
-                  $(li).append(text);
+                  li.innerHTML = html;
                   ul.append(li);
               })
             }
@@ -927,12 +950,30 @@ var CodeOceanEditor = {
         $('#output_sidebar_collapsed').addClass('d-none');
         $('#output_sidebar_uncollapsed').removeClass('d-none');
         $('#output_sidebar').removeClass('output-col-collapsed').addClass('output-col');
+        if (window.matchMedia('(min-width: 992px)').matches) {
+            $('.panel-top').css('height', '50vh');
+            $('.panel-bottom').css('height', this.calculateEditorHeight('.panel-bottom', false));
+            this.resizeSidebars();
+            $('#resizerVertical').removeClass('d-none');
+        } else {
+            $('.panel-bottom').css('height', '50vh');
+            $('html, body').animate({scrollTop: $(document).height() - $(window).height()}, 250);  
+        }
+        this.resizeAceEditors();
     },
 
     hideOutputBar: function () {
         $('#output_sidebar_collapsed').removeClass('d-none');
         $('#output_sidebar_uncollapsed').addClass('d-none');
         $('#output_sidebar').removeClass('output-col').addClass('output-col-collapsed');
+        $('#resizerVertical').addClass('d-none');
+        $('.panel-bottom').css('height', $('#output_sidebar_collapsed').height() + 'px');
+        if (window.matchMedia('(min-width: 992px)').matches) {
+            $('.panel-top').css('height', ($('#editor-column').height() - $('.panel-bottom').height()) + "px");
+        }  else {
+           $('html, body').animate({scrollTop: $(document).height() - $(window).height()}, 1);
+        }
+        this.resizeAceEditors();
     },
 
     initializeSideBarTooltips: function () {
@@ -959,6 +1000,7 @@ var CodeOceanEditor = {
      * */
     initializeInterventionTimer: function () {
         const editor = $('#editor');
+        const checkbox = $('#flexCheckChecked');
 
         if (editor.data('rfc-interventions') || editor.data('break-interventions') || editor.data('tips-interventions')) { // split in break or rfc intervention
             window.onblur = function () {
@@ -1036,6 +1078,7 @@ var CodeOceanEditor = {
                                 });
                             } else if (editor.data('rfc-interventions')) {
                                 const button = $('#requestComments');
+                                const interventionKey = 'rfcInterventionShown#' + editor.data('exercise-id') + '#' + editor.data('user-id'); // Key for storing intervention flag in localStorage
                                 // only show intervention if user did not requested for a comment already
                                 if (!button.prop('disabled')) {
                                     $('#rfc_intervention_text').show();
@@ -1045,10 +1088,18 @@ var CodeOceanEditor = {
                                         return;
                                     }
 
-                                    modal.find('.modal-footer').html(I18n.t("exercises.implement.intervention.explanation", {duration: Math.round(percentile75 / 60)}));
+                                    modal.find('.footer-content').html(I18n.t("exercises.implement.intervention.explanation", {duration: Math.round(percentile75 / 60)}));
+                                    modal.find('.col').toggleClass('d-none');
                                     modal.on('hidden.bs.modal', function () {
                                         modal.find('.modal-footer').text('');
+                                    }); 
+                                    $(document).on('change', '#flexCheckChecked', function(event) {
+                                        localStorage.setItem(interventionKey, event.target.checked); // Save the checkbox state to localStorage
                                     });
+                                    
+                                    if(localStorage.getItem(interventionKey) === 'true'){
+                                        return;
+                                    }
                                     new bootstrap.Modal(modal).show();
                                     $.ajax({
                                         data: {

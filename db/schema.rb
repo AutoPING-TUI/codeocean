@@ -636,6 +636,10 @@ ActiveRecord::Schema[7.2].define(version: 2024_11_16_105338) do
     t.datetime "updated_at", null: false
     t.float "normalized_score"
     t.bigint "submission_id"
+    t.integer "user_error_feedback"
+    t.string "user_error_feedback_text"
+    t.integer "user_estimated_worktime_minutes"
+    t.integer "user_estimated_worktime_hours"
     t.index ["submission_id"], name: "index_user_exercise_feedbacks_on_submission_id"
   end
 

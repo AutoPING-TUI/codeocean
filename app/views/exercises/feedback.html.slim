@@ -13,9 +13,8 @@ h1 = link_to_if(policy(@exercise).show?, @exercise, exercise_path(@exercise))
 
   ul.list-unstyled
     - comment_presets = UserExerciseFeedbacksController.new.comment_presets
-    - time_presets = UserExerciseFeedbacksController.new.time_presets
-    - @feedbacks.each do |feedback|
-      - contributor = feedback.user.programming_groups.find_by(exercise: @exercise).presence || feedback.user
+    - error_presets = UserExerciseFeedbacksController.new.error_presets
+    - @feedbacks.each_with_index do |feedback, index|
       li.card.mt-2
         .card-header#heading role='tab'
           .clearfix.feedback-header
@@ -27,12 +26,14 @@ h1 = link_to_if(policy(@exercise).show?, @exercise, exercise_path(@exercise))
         .card-collapse role='tabpanel'
           .card-body.feedback
             .text style="white-space: pre-wrap;" = feedback.feedback_text
-            .difficulty = "#{t('user_exercise_feedback.difficulty')} #{comment_presets[feedback.difficulty].join(' - ')}" if feedback.difficulty
-            .worktime = "#{t('user_exercise_feedback.working_time')} #{time_presets[feedback.user_estimated_worktime].join(' - ')}" if feedback.user_estimated_worktime
-        - if policy(@exercise).detailed_statistics?
-          .card-footer
-            .clearfix.feedback-header
-              span.points.flex-grow-1 = "#{t('exercises.statistics.score')}: #{@exercise.maximum_score(contributor)}"
-              span.working_time.float-end = "#{t('exercises.statistics.worktime')}: #{@exercise.average_working_time_for(contributor) || 0}"
+            .difficulty = "#{t('user_exercise_feedback.difficulty')} #{comment_presets[feedback.difficulty].second}" if feedback.difficulty
+            .worktime = "#{t('user_exercise_feedback.working_time')} #{[feedback.user_estimated_worktime_hours.to_s].join(' - ')} #{t('user_exercise_feedback.hours')} #{[feedback.user_estimated_worktime_minutes.to_s].join(' - ')} #{t('user_exercise_feedback.minutes')}" if feedback.user_estimated_worktime_minutes || feedback.user_estimated_worktime_hours
+            .errorfeedback = "#{t('user_exercise_feedback.user_error_feedback')} #{error_presets[feedback.user_error_feedback].second}" if feedback.user_error_feedback
+            .errorfeedbacktext = "#{t('user_exercise_feedback.user_error_feedback_text')} #{(feedback.user_error_feedback_text)}" if feedback.user_error_feedback_text
+          - if policy(@exercise).detailed_statistics?
+            .card-footer
+              div.clearfix.feedback-header
+                span.points.flex-grow-1 = "#{t('exercises.statistics.score')}: #{@submissions[index]&.score}"
+                span.working_time.float-end = "#{t('exercises.statistics.worktime')}: #{@exercise.average_working_time_for(feedback.user) or 0}"
 
   = render('shared/pagination', collection: @feedbacks)

@@ -18,10 +18,31 @@
           = b.radio_button(class: 'form-check-input')
           = b.text
     h4.mt-4 = t('user_exercise_feedback.working_time')
-    = f.collection_radio_buttons :user_estimated_worktime, @times, :first, :last do |b|
+    br
+    .row
+      .col-1.pt-1
+        = f.number_field :user_estimated_worktime_hours, class: 'form-control',  min: 0, step: 1, input_html: { style: 'width: 100px;', pattern: "[0-9]*" }
+      span.col-auto.pt-2
+        |h
+
+      .col-1.pt-1
+        = f.number_field :user_estimated_worktime_minutes, class: 'form-control',  min: 0, max: 59, step: 1, input_html: { style: 'width: 100px;', pattern: "[0-9]*" }
+      span.col-auto.pt-2
+        |min
+        
+    h4.mt-4 = t('user_exercise_feedback.user_error_feedback')
+    = f.collection_radio_buttons :user_error_feedback, @errors, :first, :last  do |b|
       .form-check
         label.form-check-label
           = b.radio_button(class: 'form-check-input')
           = b.text
-    = f.hidden_field(:exercise_id, value: @exercise.id)
-  .actions = render('shared/submit_button', f:, object: @uef)
+  
+    h4.mt-4 = t('user_exercise_feedback.user_error_feedback_text')
+    = f.text_area(:user_error_feedback_text, class: 'form-control', required: false, :rows => "2")
+
+
+    = f.hidden_field :exercise_id, value: @exercise.id
+    br
+
+    .actions
+      = render 'shared/submit_button', f: f, object: @uef

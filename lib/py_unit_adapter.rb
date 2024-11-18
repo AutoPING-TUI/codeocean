@@ -5,6 +5,8 @@ class PyUnitAdapter < TestingFrameworkAdapter
   FAILURES_REGEXP = /FAILED \(.*failures=(\d+).*\)/
   ERRORS_REGEXP = /FAILED \(.*errors=(\d+).*\)/
   ASSERTION_ERROR_REGEXP = /^(ERROR|FAIL):\ (.*?)\ .*?^[^.\n]*?(Error|Exception):\s((\s|\S)*?)(>>>[^>]*?)*\s\s(-|=){70}/m
+  #regex to catch bad errors hindering code execution
+  BAD_ERROR_REGEXP = /File\s\"(.*)\"(?:.*)line\s(\d+)\s*(?:.*)\s*(?:\^*)\s*(SyntaxError|IndentationError|TabError):(.*)/
 
   def self.framework_name
     'PyUnit'
@@ -44,7 +46,24 @@ class PyUnitAdapter < TestingFrameworkAdapter
       # Hence, we assume that the count is invalid and increase it by the number of failed tests.
       count += total_failed
     end
-
-    {count:, failed: total_failed, error_messages: assertion_error_matches.flatten.compact_blank.sort}.compact_blank
+    
+    #catch bad errors here
+    begin
+      bad_error_matches = Timeout.timeout(2.seconds) do
+        output[:stderr].scan(BAD_ERROR_REGEXP).map do |match|
+          file_name=match[0]
+          line_number=match[1]
+          error_name=match[2]
+          error_message=match[3].strip
+          #error message, uses markdown and in-line html in markdown
+          "<span style=\"color:red\">**#{error_name}**</span>: #{error_message} in **file** #{file_name} **line #{line_number}**"
+        end || []
+      end
+    rescue Timeout::Error
+      Sentry.capture_message({stderr: output[:stderr], regex: BAD_ERROR_REGEXP}.to_json)
+      bad_error_matches = []
+    end
+    #add bad errors to normal error array
+    {count:, failed: failed + errors, error_messages: assertion_error_matches.flatten.compact_blank+bad_error_matches}
   end
 end

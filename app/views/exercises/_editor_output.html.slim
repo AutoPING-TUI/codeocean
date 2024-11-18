@@ -14,9 +14,11 @@
           ul.list-unstyled
           ul#test-dummies.d-none.list-unstyled
             li.card.mt-2
-              .card-header.py-2
-                h5.card-title.m-0 == t('exercises.implement.test_file', filename: '', number: 0)
-              .card-body
+              .card-header.py-2.d-flex.align-items-center
+                i class='fa-solid fa-chevron-right'
+                h5.card-title.m-0 
+                  == t('exercises.implement.test_file', filename: '', number: 0)
+              .card-body.bg-white.text-dark.d-none
                 = row(label: 'exercises.implement.passed_tests') do
                   span.number
                     | 0

@@ -1,0 +1,85 @@
+    app/: Dieser Ordner enthält die Hauptanwendungsdateien wie Modelle, Ansichten und Controller.
+
+    app/assets/: Dieser Ordner enthält alle Assets wie Stylesheets, JavaScript-Dateien, Bilder usw.
+
+    app/controllers/: Dieser Ordner enthält die Controller-Klassen, die die Logik der Anwendung implementieren.
+
+    app/models/: Dieser Ordner enthält die Model-Klassen, die die Datenbank-Modelle repräsentieren.
+
+    app/views/: Dieser Ordner enthält die Views-Klassen, die das Frontend der Anwendung implementieren.
+
+    bin/: Dieser Ordner enthält ausführbare Dateien wie rails, rake und bundle.
+
+    config/: Dieser Ordner enthält Konfigurationsdateien für die Anwendung.
+
+    config.ru: Dies ist eine Rack-Konfigurationsdatei, die die Anwendung startet.
+
+    db/: Dieser Ordner enthält Datenbankdateien wie Migrationen und Seeds.
+
+    Gemfile: Diese Datei enthält eine Liste aller verwendeten Gems.
+
+    Gemfile.lock: Diese Datei enthält eine Liste aller verwendeten Gems mit ihren Abhängigkeiten und Versionen.
+
+    lib/: Dieser Ordner enthält zusätzliche Bibliotheken und Dienstprogramme, die von der Anwendung verwendet werden.
+
+    log/: Dieser Ordner enthält Log-Dateien, die von der Anwendung generiert werden.
+
+    public/: Dieser Ordner enthält statische Dateien wie Bilder, JavaScript-Dateien und Stylesheets.
+
+    test/: Dieser Ordner enthält Testdateien für die Anwendung.
+
+    tmp/: Dieser Ordner enthält temporäre Dateien, die von der Anwendung generiert werden.
+
+    vendor/: Dieser Ordner enthält Fremdanbieter-Code und Bibliotheken, die von der Anwendung verwendet werden.
+
+
+
+Grundsätzlicher Ablauf:
+    Der Benutzer öffnet einen Webbrowser und gibt die URL der CodeOcean-Anwendung ein.
+
+    Der Webserver empfängt die Anfrage und leitet sie an die Ruby on Rails-Anwendung weiter.
+
+    Rails sucht nach der entsprechenden Route, um die Anfrage zu verarbeiten. Die Route definiert, welche Controller-Methode die Anfrage verarbeiten wird.
+
+    Wenn der Benutzer eine neue Aufgabe erstellt oder eine vorhandene Aufgabe ausführt, ruft der ExercisesController die entsprechenden Methoden in den Modellen auf, um 
+    die Daten aus der Datenbank abzurufen und zu speichern.
+
+    Wenn die Daten bereit sind, gibt der ExercisesController sie an die show-Methode weiter, die die Ansicht für die einzelne Aufgabe generiert.
+
+    Die show-Methode gibt die Daten an die Vorlage exercises/show.html.erb weiter, die die Darstellung der Aufgabe auf der Webseite steuert.
+
+    Wenn der Benutzer eine Änderung an einer Aufgabe vornimmt, sendet der Webbrowser des Benutzers eine HTTP-POST-Anforderung an den ExercisesController, der die 
+    entsprechenden Methoden in den Modellen aufruft, um die Änderungen in der Datenbank zu speichern.
+
+    Wenn der Benutzer eine neue Ausführung einer Aufgabe startet, sendet der Webbrowser des Benutzers eine HTTP-POST-Anforderung an den ExerciseExecutionsController, der eine
+    neue Instanz des Modells ExerciseExecution erstellt und die Ausführung startet.
+
+    Der ExerciseExecutionsController führt die Ausführung aus, indem er die Eingabeparameter an den DockerService übergibt und die Ausgabe des Containers zurückbekommt.
+
+    Der ExerciseExecutionsController speichert die Ausgabe in der Datenbank und gibt sie an die show-Methode weiter.
+
+    Die show-Methode gibt die Ausgabe an die Vorlage exercise_executions/show.html.erb weiter, die die Darstellung der Ausgabe auf der Webseite steuert.
+
+
+    Der "App" Ordner:
+    controllers: Enthält die Controller-Klassen, die die Logik der Anwendung steuern, indem sie Anforderungen von Routen entgegennehmen und Daten an die Views und Models 
+    weitergeben. Einige wichtige Dateien sind:
+        application_controller.rb: Der Stamm-Controller, von dem alle anderen Controller-Klassen erben. Enthält Methoden, die in allen Controllern verwendet werden können.
+        exercises_controller.rb: Steuert die Anzeige, das Erstellen und die Ausführung von Übungen.
+        exercise_executions_controller.rb: Steuert die Anzeige von Ausführungen von Übungen.
+
+    models: Enthält die Model-Klassen, die die Datenbank-Tabellen und -Spalten darstellen und Methoden zur Abfrage und Manipulation der Datenbank bereitstellen. Einige
+    wichtige Dateien sind:
+        exercise.rb: Das Modell, das die Übungsentitäten repräsentiert.
+        exercise_execution.rb: Das Modell, das die Ausführungsentitäten von Übungen repräsentiert.
+        user.rb: Das Modell, das die Benutzerentitäten repräsentiert.
+
+    views: Enthält die Vorlagen-Dateien, die das Aussehen der Anwendung steuern. Sie verwenden HTML, CSS und Ruby-Code, um die von den Controllern bereitgestellten Daten
+    anzuzeigen. Einige wichtige Dateien sind:
+        exercises/index.html.erb: Die Vorlage, die die Übungsliste anzeigt.
+        exercises/show.html.erb: Die Vorlage, die eine einzelne Übung anzeigt.
+        exercise_executions/show.html.erb: Die Vorlage, die die Ausgabe einer Übungsausführung anzeigt.
+
+    helpers: Enthält die Helper-Module, die in den Vorlagen verwendet werden können, um häufig verwendete Funktionen bereitzustellen.
+
+    assets: Enthält statische Ressourcen wie Bilder, JavaScript- und CSS-Dateien.

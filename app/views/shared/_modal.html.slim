@@ -8,13 +8,18 @@
   .modal-dialog.modal-dialog-centered.modal-dialog-scrollable class=size
     .modal-content
       .modal-header
-        h4.modal-title#modal-title = title
-        button.btn-close data-bs-dismiss='modal' aria-label=t('shared.close') type='button'
-          span.visually-hidden = t('shared.close')
-
-      .modal-body *modal_body_attributes
-        = render(layout: false, locals: (local_assigns[:template_variables] || {}).merge(modal: true), template:)
-
-      - if content_for? :modal_footer
-        .modal-footer
-          = clear_content_for :modal_footer
+        h4#modal-title.modal-title = title
+        button.btn-close data-bs-dismiss='modal' type='button'
+          span.visually-hidden Close
+      .modal-body
+        - if local_assigns.has_key?(:body)
+          = body
+        - else
+          = render(layout: false, locals: (local_assigns[:template_variables] || {}).merge(modal: true), template: template)
+      .modal-footer
+        div.footer-content
+          = yield(:modal_footer)
+        .col.d-none
+          label.p-3.form-check-label[for="flexCheckChecked"]
+            input#flexCheckChecked.form-check-input[type="checkbox" value="" unchecked]
+          == t('exercises.implement.comment.doNotShowAgain')        

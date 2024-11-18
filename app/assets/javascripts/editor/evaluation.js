@@ -22,8 +22,11 @@ CodeOceanEditorEvaluation = {
 
             this.showSpinner($('#assess'));
             $('#score_div').removeClass('d-none');
-            await this.socketScoreCode(submission.id);
-        });
+            var url = response.score_url;
+            this.initializeSocketForScoring(url);
+        }.bind(this));
+        this.showOutputBar();
+        $('html, body').animate({scrollTop: $(document).height() - $(window).height()}, 500);  
     },
 
     handleScoringResponse: function (results) {

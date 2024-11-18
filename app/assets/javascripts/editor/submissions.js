@@ -175,20 +175,12 @@ CodeOceanEditorSubmissions = {
    */
   runCode: function(event) {
     event.preventDefault();
-    const cause = $('#run');
-    this.newSentryTransaction(cause, async () => {
-      await this.stopCode(event);
-      if (!cause.is(':visible')) return;
-
-      const submission = await this.createSubmission(cause, null).catch((response) => {
-        this.ajaxError(response);
-        cause.one('click', this.runCode.bind(this));
-      });
-
-      if (!submission) return;
-
-      await this.runSubmission(submission);
-    });
+    this.stopCode(event);
+    if ($('#run').is(':visible')) {
+      this.createSubmission('#run', null, this.runSubmission.bind(this));
+    }
+    this.showOutputBar();
+    $('html, body').animate({scrollTop: $(document).height() - $(window).height()}, 500);  
   },
 
   runSubmission: async function (submission) {
