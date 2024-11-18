@@ -1,0 +1,7 @@
+./org/example/RecursiveMath.java:12: error: bad operand types for binary operator '+'
+        System.out.println(a+b);
+                            ^
+  first type:  int
+  second type: boolean
+1 error
+make: *** [Makefile:5: test] Error 1

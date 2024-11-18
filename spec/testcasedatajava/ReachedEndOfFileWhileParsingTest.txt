@@ -1,0 +1,5 @@
+./org/example/RecursiveMath.java:22: error: reached end of file while parsing
+}
+ ^
+1 error
+make: *** [Makefile:5: test] Error 1

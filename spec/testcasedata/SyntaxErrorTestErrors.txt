@@ -1,0 +1,1 @@
+["<span style=\"color:red\">**SyntaxError**</span>: invalid syntax in **file** /workspace/exercise.py **line 1**"]

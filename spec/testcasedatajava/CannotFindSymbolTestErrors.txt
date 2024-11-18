@@ -1,0 +1,1 @@
+["<span style=\"color:red\">**Compilation Error**</span> in **file** ./org/example/RecursiveMath **line 11** occured **cannot find symbol** at System.out.println(i);\n symbol:   variable i\r\n location: class RecursiveMath\r "]

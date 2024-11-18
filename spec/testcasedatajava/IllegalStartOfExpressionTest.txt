@@ -1,0 +1,5 @@
+./org/example/RecursiveMath.java:10: error: illegal start of expression
+        private int i=0;
+        ^
+1 error
+make: *** [Makefile:5: test] Error 1

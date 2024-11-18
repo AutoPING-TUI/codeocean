@@ -1,0 +1,5 @@
+./org/example/RecursiveMath.java:6: error: non-static variable field cannot be referenced from a static context
+                    field = parm;
+                    ^
+1 error
+make: *** [Makefile:5: test] Error 1

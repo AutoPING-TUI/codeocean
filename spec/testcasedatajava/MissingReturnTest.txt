@@ -1,0 +1,5 @@
+./org/example/RecursiveMath.java:19: error: missing return statement
+    }
+    ^
+1 error
+make: *** [Makefile:5: test] Error 1
