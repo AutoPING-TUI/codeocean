@@ -25,3 +25,11 @@ de:
     estimated_time_more_30: mehr als 30 Minuten
     no_feedback: Es wurde noch kein Feedback zu dieser Aufgabe gegeben.
     working_time: 'Geschätze Bearbeitungszeit für diese Aufgabe:'
+    very_good: "sehr hilfreich"
+    good: "hilfreich"
+    neutral: "okay"
+    bad: "weniger hilfreich"
+    very_bad: "gar nicht hilfreich"
+    user_error_feedback: "Das Fehlerfeedback war:"
+    minutes: "Minuten"
+    hours: "Stunden"

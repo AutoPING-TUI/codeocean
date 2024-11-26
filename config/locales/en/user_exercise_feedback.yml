@@ -25,3 +25,12 @@ en:
     estimated_time_more_30: more than 30 minutes
     no_feedback: There is no feedback for this exercise yet.
     working_time: 'Estimated time working on this exercise:'
+    very_good: "very helpful"
+    good: "helpful"
+    neutral: "okayish"
+    bad: "less helpful"
+    very_bad: "not helpful at all"
+    user_error_feedback: "The error feedbacks were:"
+    user_error_feedback_text: "Why do I think so? (Please only answer if your answer to the question above was negative.):"
+    minutes: "minutes"
+    hours: "hours"
