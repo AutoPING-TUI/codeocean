@@ -2637,10 +2637,12 @@ __metadata:
     sass: "npm:^1.81.0"
     sass-loader: "npm:^16.0.3"
     shakapacker: "npm:8.0.2"
+    showdown: "npm:^2.1.0"
     sortablejs: "npm:^1.15.3"
     sorttable: "npm:^1.0.2"
     style-loader: "npm:^4.0.0"
     terser-webpack-plugin: "npm:^5.3.10"
+    theme-change: "npm:^2.5.0"
     underscore: "npm:^1.13.7"
     uuid: "npm:^11.0.3"
     vis-data: "npm:^7.1.9"
@@ -2705,6 +2707,13 @@ __metadata:
   version: 2.20.3
   resolution: "commander@npm:2.20.3"
   checksum: 10c0/74c781a5248c2402a0a3e966a0a2bba3c054aad144f5c023364be83265e796b20565aa9feff624132ff629aa64e16999fa40a743c10c12f7c61e96a794b99288
+  languageName: node
+  linkType: hard
+
+"commander@npm:^9.0.0":
+  version: 9.5.0
+  resolution: "commander@npm:9.5.0"
+  checksum: 10c0/5f7784fbda2aaec39e89eb46f06a999e00224b3763dc65976e05929ec486e174fe9aac2655f03ba6a5e83875bd173be5283dc19309b7c65954701c02025b3c1d
   languageName: node
   linkType: hard
 
@@ -6436,6 +6445,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"showdown@npm:^2.1.0":
+  version: 2.1.0
+  resolution: "showdown@npm:2.1.0"
+  dependencies:
+    commander: "npm:^9.0.0"
+  bin:
+    showdown: bin/showdown.js
+  checksum: 10c0/8508e060874c42338b9ebfe884763e8042d9575185d9dd3a12f7380736732893a4738f37140add97bde0c4c87d6bad66ed0761505f310df6044ee3385e2ae349
+  languageName: node
+  linkType: hard
+
 "side-channel@npm:^1.0.6":
   version: 1.0.6
   resolution: "side-channel@npm:1.0.6"
@@ -6771,6 +6791,13 @@ __metadata:
   bin:
     terser: bin/terser
   checksum: 10c0/f4ed2bead19f64789ddcfb85b7cef78f3942f967b8890c54f57d1e35bc7d547d551c6a4c32210bce6ba45b1c738314bbfac6acbc6c762a45cd171777d0c120d9
+  languageName: node
+  linkType: hard
+
+"theme-change@npm:^2.5.0":
+  version: 2.5.0
+  resolution: "theme-change@npm:2.5.0"
+  checksum: 10c0/6f4824856f9e3d86eb59c2f798418ad8b3d86de42180b734fcc80ac5b2ba587b848712414c8111f99393d21ba63cc4c00099258138fa2f2ad231aaefa5f61465
   languageName: node
   linkType: hard
 
