@@ -16,7 +16,6 @@ Rails.application.routes.draw do
       get 'by_file_type/:file_type_id', as: :by_file_type, action: :by_file_type
     end
   end
-  resources :codeharbor_links, only: %i[new create edit update destroy]
   resources :request_for_comments, except: %i[edit destroy] do
     member do
       get :mark_as_solved, defaults: {format: :json}
@@ -124,6 +123,7 @@ Rails.application.routes.draw do
     member do
       get :tag_statistics
     end
+    resources :codeharbor_links, only: %i[new create edit update destroy]
   end
 
   namespace :code_ocean do
@@ -138,7 +138,9 @@ Rails.application.routes.draw do
     member do
       match 'activate', to: 'internal_users#activate', via: %i[get patch put]
       match 'reset_password', to: 'internal_users#reset_password', via: %i[get patch put]
+      match 'change_password', to: 'internal_users#change_password', via: %i[get patch put]
     end
+    resources :codeharbor_links, only: %i[new create edit update destroy]
   end
 
   match '/forgot_password', as: 'forgot_password', to: 'internal_users#forgot_password', via: %i[get post]
@@ -186,7 +188,7 @@ Rails.application.routes.draw do
 
   # Render dynamic PWA files from app/views/pwa/*
   get 'service-worker', to: 'rails/pwa#service_worker', as: :pwa_service_worker, defaults: {format: :js}
-  get 'manifest', to: 'rails/pwa#manifest', as: :pwa_manifest, defaults: {format: :webmanifest}
+  get 'manifest(.:file_extension)', to: 'rails/pwa#manifest', as: :pwa_manifest, defaults: {format: :webmanifest}, format: false, constraints: {file_extension: %w[json webmanifest]}
 
   # Defines the root path route ("/")
   root to: 'application#welcome'

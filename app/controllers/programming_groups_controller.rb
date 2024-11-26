@@ -10,7 +10,12 @@ class ProgrammingGroupsController < ApplicationController
   def index
     set_exercise_and_authorize if params[:exercise_id].present?
     @search = policy_scope(ProgrammingGroup).ransack(params[:q], {auth_object: current_user})
-    @programming_groups = @search.result.includes(:exercise, :programming_group_memberships, :internal_users, :external_users).order(:id).paginate(page: params[:page], per_page: per_page_param)
+    if params[:exercise_id].present?
+      @programming_groups = @search.result.where(exercise: @exercise)
+    else
+      @programming_groups = @search.result
+    end
+    @programming_groups = @programming_groups.includes(:exercise, :programming_group_memberships, :internal_users, :external_users).order(:id).paginate(page: params[:page], per_page: per_page_param)
     authorize!
   end
 
@@ -38,8 +43,9 @@ class ProgrammingGroupsController < ApplicationController
   end
 
   def create
-    programming_partner_ids = programming_group_params&.fetch(:programming_partner_ids, [])&.split(',')&.map(&:strip)&.uniq
-    users = programming_partner_ids&.map do |partner_id|
+    programming_partner_ids = []
+    programming_partner_ids = programming_group_params.fetch(:programming_partner_ids, '').split(',').map(&:strip).uniq if programming_group_params
+    users = programming_partner_ids.map do |partner_id|
       User.find_by_id_with_type(partner_id)
     rescue ActiveRecord::RecordNotFound
       partner_id
@@ -47,7 +53,7 @@ class ProgrammingGroupsController < ApplicationController
     @programming_group = ProgrammingGroup.new(exercise: @exercise, users:)
     authorize!
 
-    unless programming_partner_ids&.include? current_user.id_with_type
+    unless programming_partner_ids.include? current_user.id_with_type
       @programming_group.add(current_user)
     end
 

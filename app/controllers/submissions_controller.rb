@@ -140,6 +140,7 @@ class SubmissionsController < ApplicationController
         case event[:cmd]
           when :client_kill
             @testrun[:status] = :terminated_by_client
+            runner_socket&.close(:terminated_by_client)
             close_client_connection(client_socket)
             Rails.logger.debug('Client exited container.')
           when :result, :canvasevent, :exception
@@ -167,6 +168,9 @@ class SubmissionsController < ApplicationController
 
     # If running is not allowed (and the socket is closed), we can stop here.
     return true if @embed_options[:disable_run]
+    # If the tubesock handshake failed (and we didn't got a socket), we can stop here.
+    # With our custom tubesock patch, this will render a 426 status code already.
+    return true if client_socket.nil?
 
     @testrun[:output] = +''
     durations = @submission.run(@file) do |socket, starting_time|
@@ -267,8 +271,8 @@ class SubmissionsController < ApplicationController
     # send_hints(client_socket, StructuredError.where(submission: @submission))
 
     # Finally, send the score to the LTI consumer and check for notifications
-    check_submission(send_scores(@submission)).compact.each do |notification|
-      client_socket&.send_data(notification&.merge(cmd: :status)&.to_json)
+    check_submission(send_scores(@submission)).compact_blank.each do |notification|
+      client_socket&.send_data(notification.merge(cmd: :status).to_json)
     end
   rescue Runner::Error::RunnerInUse => e
     extract_durations(e)
@@ -338,6 +342,8 @@ class SubmissionsController < ApplicationController
   end
 
   def close_client_connection(client_socket)
+    return if client_socket&.closed?
+
     # search for errors and save them as StructuredError (for scoring runs see submission.rb)
     errors = extract_errors
     send_hints(client_socket, errors)
@@ -409,7 +415,7 @@ class SubmissionsController < ApplicationController
                           end
     @testrun[:messages].push message
     @testrun[:status] = message[:status] if message[:status]
-    client_socket.send_data(message.to_json)
+    client_socket&.send_data(message.to_json)
   end
 
   def max_output_buffer_size
@@ -439,7 +445,6 @@ class SubmissionsController < ApplicationController
       waiting_for_container_time: @testrun[:waiting_for_container_time]
     )
     TestrunMessage.create_for(testrun, @testrun[:messages])
-    TestrunExecutionEnvironment.create(testrun:, execution_environment: @submission.used_execution_environment)
   end
 
   def send_hints(tubesock, errors)

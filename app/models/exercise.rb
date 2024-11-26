@@ -7,6 +7,7 @@ class Exercise < ApplicationRecord
   include Creation
   include DefaultValues
   include TimeHelper
+  include RansackObject
 
   after_initialize :generate_token
   after_initialize :set_default_values
@@ -45,14 +46,16 @@ class Exercise < ApplicationRecord
   validates :token, presence: true, uniqueness: true
   validates :uuid, uniqueness: {if: -> { uuid.present? }}
 
+  delegate :to_s, to: :title
+
   @working_time_statistics = nil
   attr_reader :working_time_statistics
 
   MAX_GROUP_EXERCISE_FEEDBACKS = 20
 
-  def average_percentage
-    if average_score && (maximum_score.to_d != BigDecimal('0.0')) && submissions.exists?(cause: 'submit')
-      (average_score / maximum_score * 100).round(2)
+  def average_percentage(base = submissions)
+    if average_score(base) && (maximum_score.to_d != BigDecimal('0.0')) && base.exists?(cause: %w[submit assess remoteSubmit remoteAssess])
+      (average_score(base) / maximum_score * 100).round(2)
     else
       0
     end
@@ -66,9 +69,9 @@ class Exercise < ApplicationRecord
     end
   end
 
-  def average_score
+  def average_score(base = submissions)
     Submission.from(
-      submissions.group(:contributor_id, :contributor_type)
+      base.group(:contributor_id, :contributor_type)
                  .select('MAX(score) as max_score')
     ).average(:max_score).to_f
   end
@@ -83,7 +86,7 @@ class Exercise < ApplicationRecord
 
   def time_maximum_score(contributor)
     submissions
-      .where(contributor:, cause: %w[submit assess])
+      .where(contributor:, cause: %w[submit assess remoteSubmit remoteAssess])
       .where.not(score: nil)
       .order(score: :desc, created_at: :asc)
       .first&.created_at || Time.zone.at(0)
@@ -527,7 +530,7 @@ class Exercise < ApplicationRecord
   def maximum_score(contributor = nil)
     if contributor
       submissions
-        .where(contributor:, cause: %w[submit assess])
+        .where(contributor:, cause: %w[submit assess remoteSubmit remoteAssess])
         .where.not(score: nil)
         .order(score: :desc)
         .first&.score || 0
@@ -548,18 +551,14 @@ class Exercise < ApplicationRecord
     maximum_score(contributor).to_i == maximum_score.to_i
   end
 
-  def finishers_count
-    Submission.from(submissions.where(score: maximum_score, cause: %w[submit assess remoteSubmit remoteAssess]).group(:contributor_id, :contributor_type).select(:contributor_id, :contributor_type), 'submissions').count
+  def finishers_count(base = submissions)
+    Submission.from(base.where(score: maximum_score, cause: %w[submit assess remoteSubmit remoteAssess]).group(:contributor_id, :contributor_type).select(:contributor_id, :contributor_type), 'submissions').count
   end
 
   def set_default_values
     set_default_values_if_present(public: false)
   end
   private :set_default_values
-
-  def to_s
-    title
-  end
 
   def valid_main_file?
     if files.count(&:main_file?) > 1

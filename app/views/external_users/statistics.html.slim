@@ -1,37 +1,29 @@
 h1 = t('.title', user: @user.displayname)
 
-- submissions = policy_scope(Submission).where(contributor: @user)
-- exercises = Exercise.where(id: submissions.joins(:exercise).group(:exercise_id).select(:exercise_id).distinct).compact
-
-- if submissions.any?
+- if statistics.present?
   .table-responsive
-    table.table.table-striped class=(exercises.present? ? 'sortable' : '')
+    table.table.table-striped class=(statistics.present? ? 'sortable' : '')
       thead
         tr
           th.header = t('.exercise')
           th.header = t('.score')
           th.header = t('.deadline')
-          th.header = t('.runs') if policy(exercises.first).detailed_statistics?
-          th.header = t('.worktime') if policy(exercises.first).detailed_statistics?
+          th.header = t('.runs') if policy(statistics.keys.first).detailed_statistics?
+          th.header = t('.worktime') if policy(statistics.keys.first).detailed_statistics?
       tbody
-        - exercises.each do |exercise|
-          // Grab any submission in context of study group (or all if admin). Then check for permission
-          - any_submission = submissions.where(exercise:).first
-          - if any_submission && policy(any_submission).show_study_group? && statistics[exercise.id]
-            - stats = statistics[exercise.id]
-            tr
-              td = link_to exercise, controller: 'exercises', action: 'external_user_statistics', external_user_id: @user.id, id: exercise.id
-              td = stats['maximum_score'] || 0
-              td.align-middle
-                - latest_viewable_submission = submissions.where(exercise:).final.latest
-                - if latest_viewable_submission.present?
-                  - if latest_viewable_submission.before_deadline?
-                    .unit-test-result.positive-result.before_deadline
-                  - elsif latest_viewable_submission.within_grace_period?
-                    .unit-test-result.unknown-result.within_grace_period
-                  - elsif latest_viewable_submission.after_late_deadline?
-                    .unit-test-result.negative-result.after_late_deadline
-              td = stats['runs'] || 0 if policy(exercises.first).detailed_statistics?
-              td = stats['working_time'] || 0 if policy(exercises.first).detailed_statistics?
+        - statistics.each do |exercise, submission_stat|
+          tr
+            td = link_to exercise, statistics_external_user_exercise_path(@user, exercise)
+            td = submission_stat['maximum_score'] || 0.0
+            td.align-middle
+              - if submission_stat.created_at.present?
+                - if submission_stat.before_deadline?
+                  .deadline-result.positive-result
+                - elsif submission_stat.within_grace_period?
+                  .deadline-result.unknown-result
+                - elsif submission_stat.after_late_deadline?
+                  .deadline-result.negative-result
+            td = submission_stat['runs'] || 0 if policy(exercise).detailed_statistics?
+            td = format_time_difference(submission_stat['working_time']) if policy(exercise).detailed_statistics?
 - else
   = t('exercises.external_users.statistics.no_data_available')

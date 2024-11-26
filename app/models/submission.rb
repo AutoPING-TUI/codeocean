@@ -32,23 +32,21 @@ class Submission < ApplicationRecord
   delegate :execution_environment, to: :exercise
 
   scope :final, -> { where(cause: %w[submit remoteSubmit]) }
-  scope :intermediate, -> { where.not(cause: 'submit') }
+  scope :intermediate, -> { where.not(cause: %w[submit remoteSubmit]) }
 
   scope :before_deadline, lambda {
-                            joins(:exercise).where('submissions.updated_at <= exercises.submission_deadline OR exercises.submission_deadline IS NULL')
+                            joins(:exercise).where('submissions.created_at <= exercises.submission_deadline OR exercises.submission_deadline IS NULL')
                           }
   scope :within_grace_period, lambda {
-                                joins(:exercise).where('(submissions.updated_at > exercises.submission_deadline) AND (submissions.updated_at <= exercises.late_submission_deadline OR exercises.late_submission_deadline IS NULL)')
+                                joins(:exercise).where('(submissions.created_at > exercises.submission_deadline) AND (submissions.created_at <= exercises.late_submission_deadline OR exercises.late_submission_deadline IS NULL)')
                               }
   scope :after_late_deadline, lambda {
-                                joins(:exercise).where('submissions.updated_at > exercises.late_submission_deadline')
+                                joins(:exercise).where('submissions.created_at > exercises.late_submission_deadline')
                               }
 
-  scope :latest, -> { order(updated_at: :desc).first }
+  scope :latest, -> { order(submissions: {created_at: :desc}).first }
 
   validates :cause, inclusion: {in: CAUSES}
-
-  attr_reader :used_execution_environment
 
   # after_save :trigger_working_times_action_cable
 
@@ -97,7 +95,7 @@ class Submission < ApplicationRecord
 
   def before_deadline?
     if exercise.submission_deadline.present?
-      updated_at <= exercise.submission_deadline
+      created_at <= exercise.submission_deadline
     else
       false
     end
@@ -105,7 +103,7 @@ class Submission < ApplicationRecord
 
   def within_grace_period?
     if exercise.submission_deadline.present? && exercise.late_submission_deadline.present?
-      updated_at > exercise.submission_deadline && updated_at <= exercise.late_submission_deadline
+      created_at > exercise.submission_deadline && created_at <= exercise.late_submission_deadline
     else
       false
     end
@@ -113,9 +111,9 @@ class Submission < ApplicationRecord
 
   def after_late_deadline?
     if exercise.late_submission_deadline.present?
-      updated_at > exercise.late_submission_deadline
+      created_at > exercise.late_submission_deadline
     elsif exercise.submission_deadline.present?
-      updated_at > exercise.submission_deadline
+      created_at > exercise.submission_deadline
     else
       false
     end
@@ -154,14 +152,17 @@ class Submission < ApplicationRecord
 
       # We sort the test files, so that the linter checks are run first. This prevents a modification of the test file
       file_scores = assessments.sort_by {|file| file.teacher_defined_linter? ? 0 : 1 }.map.with_index(1) do |file, index|
-        output = run_test_file file, runner, waiting_duration
+        output = run_file :test_command, file, runner, waiting_duration
         # If the previous execution failed and there is at least one more test, we request a new runner.
-        runner, waiting_duration = swap_runner(runner) if output[:status] == :timeout && index < assessment_number
+        swap_runner(runner) if output[:status] == :timeout && index < assessment_number
         score_file(output, file, requesting_user)
       end
     end
-    # We sort the files again, so that the linter tests are displayed last.
-    file_scores&.sort_by! {|file| file[:file_role] == 'teacher_defined_linter' ? 1 : 0 }
+    # We sort the files again, so that *optional* linter tests are displayed last.
+    # All other files are sorted alphabetically.
+    file_scores&.sort_by! do |file|
+      [file[:file_role] == 'teacher_defined_linter' && file[:weight].zero? ? 1 : 0, file[:filename]]
+    end
     combine_file_scores(file_scores)
   end
 
@@ -171,7 +172,7 @@ class Submission < ApplicationRecord
     run_command = command_for execution_environment.run_command, file.filepath
     durations = {}
     prepared_runner do |runner, waiting_duration|
-      durations[:execution_duration] = runner.attach_to_execution(run_command, &block)
+      durations[:execution_duration] = runner.attach_to_execution(run_command, exclusive: false, &block)
       durations[:waiting_duration] = waiting_duration
     rescue Runner::Error => e
       e.waiting_duration = waiting_duration
@@ -180,23 +181,9 @@ class Submission < ApplicationRecord
     durations
   end
 
-  # @raise [Runner::Error] if the file could not be tested due to a failure with the runner.
-  #                        See the specific type and message for more details.
   def test(file, requesting_user)
-    prepared_runner do |runner, waiting_duration|
-      output = run_test_file file, runner, waiting_duration
-      score_file output, file, requesting_user
-    rescue Runner::Error => e
-      e.waiting_duration = waiting_duration
-      raise
-    end
-  end
-
-  def run_test_file(file, runner, waiting_duration)
-    test_command = command_for execution_environment.test_command, file.filepath
-    result = {file_role: file.role, waiting_for_container_time: waiting_duration}
-    output = runner.execute_command(test_command, raise_exception: false)
-    result.merge(output)
+    output = execute :test_command, file
+    score_file output, file, requesting_user
   end
 
   def self.ransackable_attributes(_auth_object = nil)
@@ -213,45 +200,58 @@ class Submission < ApplicationRecord
     files&.map(&attribute.to_proc)&.zip(files).to_h
   end
 
-  def prepared_runner
+  def prepared_runner(existing_runner: nil, exclusive: true)
     request_time = Time.zone.now
     begin
-      runner = Runner.for(contributor, exercise.execution_environment)
+      runner = existing_runner || Runner.for(contributor, exercise.execution_environment)
+      runner.reserve! if exclusive
       files = collect_files
 
       case cause
-        when 'run'
-          files.reject!(&:reference_implementation?)
-          files.reject!(&:teacher_defined_assessment?)
-        when 'assess'
+        when 'run', 'test'
+          files.reject! do |file|
+            next true if file.reference_implementation?
+            # Only remove teacher-defined assessments if they are hidden.
+            # Otherwise, 'test' might fail if a teacher-defined assessment is executed.
+            next true if file.teacher_defined_assessment? && file.hidden?
+
+            next false
+          end
+        when 'assess', 'submit', 'remoteAssess', 'remoteSubmit', 'requestComments'
           regular_filepaths = files.reject(&:reference_implementation?).map(&:filepath)
           files.reject! {|file| file.reference_implementation? && regular_filepaths.include?(file.filepath) }
       end
 
       Rails.logger.debug { "#{Time.zone.now.getutc.inspect}: Copying files to Runner #{runner.id} for #{contributor_type} #{contributor_id} and Submission #{id}." }
-      runner.copy_files(files)
+      # We don't want `copy_files` to be exclusive since we reserve runners for the whole `prepared_runner` block.
+      runner.copy_files(files, exclusive: false)
     rescue Runner::Error => e
       e.waiting_duration = Time.zone.now - request_time
       raise
     end
     waiting_duration = Time.zone.now - request_time
-    yield(runner, waiting_duration)
+    yield(runner, waiting_duration) if block_given?
+  ensure
+    runner&.release! if exclusive
   end
 
-  def swap_runner(old_runner)
-    old_runner.update(runner_id: nil)
-    new_runner = nil
-    new_waiting_duration = nil
-    # We request a new runner that will also include all files of the current submission
-    prepared_runner do |runner, waiting_duration|
-      new_runner = runner
-      new_waiting_duration = waiting_duration
+  def swap_runner(runner, exclusive: true)
+    # We use a transaction to ensure that the runner is swapped atomically.
+    transaction do
+      # Due to the `before_validation` callback in the `Runner` model,
+      # the following line will immediately request a new runner.
+      runner.update(runner_id: nil)
+
+      # With the new runner being ready, we only need to prepare it (by copying the files).
+      # Since no actual execution is performed, we don't need to reserve the runner.
+      prepared_runner(existing_runner: runner, exclusive: false)
+
+      # Now, we update the locks if desired. This is only necessary when a runner is used exclusively.
+      runner.extend! if exclusive
     end
-    [new_runner, new_waiting_duration]
   end
 
-  def command_for(template, file)
-    filepath = collect_files.find {|f| f.filepath == file }.filepath
+  def command_for(template, filepath)
     template % command_substitutions(filepath)
   end
 
@@ -261,6 +261,24 @@ class Submission < ApplicationRecord
       filename:,
       module_name: File.basename(filename, File.extname(filename)).underscore,
     }
+  end
+
+  # @raise [Runner::Error] if the file could not be tested due to a failure with the runner.
+  #                        See the specific type and message for more details.
+  def execute(action, file)
+    prepared_runner do |runner, waiting_duration|
+      run_file action, file, runner, waiting_duration
+    rescue Runner::Error => e
+      e.waiting_duration = waiting_duration
+      raise
+    end
+  end
+
+  def run_file(action, file, runner, waiting_duration)
+    command = command_for execution_environment.public_send(action), file.filepath
+    result = {file_role: file.role, waiting_for_container_time: waiting_duration}
+    output = runner.execute_command(command, raise_exception: false, exclusive: false)
+    result.merge(output)
   end
 
   def score_file(output, file, requesting_user)
@@ -287,7 +305,6 @@ class Submission < ApplicationRecord
       waiting_for_container_time: output[:waiting_for_container_time]
     )
     TestrunMessage.create_for(testrun, output[:messages])
-    TestrunExecutionEnvironment.create(testrun:, execution_environment: @used_execution_environment)
 
     filename = file.filepath
 

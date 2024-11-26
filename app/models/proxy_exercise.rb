@@ -18,6 +18,8 @@ class ProxyExercise < ApplicationRecord
 
   validates :public, inclusion: [true, false]
 
+  delegate :to_s, to: :title
+
   def count_files
     exercises.count
   end
@@ -40,10 +42,6 @@ class ProxyExercise < ApplicationRecord
     proxy_exercise = dup
     proxy_exercise.attributes = attributes
     proxy_exercise
-  end
-
-  def to_s
-    title
   end
 
   def get_matching_exercise(user)
@@ -78,7 +76,7 @@ class ProxyExercise < ApplicationRecord
   end
 
   def find_matching_exercise(user)
-    exercises_user_has_accessed = user.submissions.where("cause IN ('submit','assess')").map(&:exercise).uniq.compact
+    exercises_user_has_accessed = user.submissions.where(cause: %w[submit assess remoteSubmit remoteAssess]).map(&:exercise).uniq.compact
     tags_user_has_seen = exercises_user_has_accessed.map(&:tags).uniq.flatten
     Rails.logger.debug { "exercises_user_has_accessed #{exercises_user_has_accessed.map(&:id).join(',')}" }
 

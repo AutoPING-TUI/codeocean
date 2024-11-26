@@ -13,6 +13,10 @@ class InternalUserPolicy < AdminOnlyPolicy
     admin? || @record == @user || teacher_in_study_group?
   end
 
+  %i[change_codeharbor_link? change_password?].each do |action|
+    define_method(action) { admin? || @record == @user }
+  end
+
   class Scope < Scope
     def resolve
       if @user.admin?
@@ -21,7 +25,7 @@ class InternalUserPolicy < AdminOnlyPolicy
         @scope.joins(:study_group_memberships)
           .where(study_group_memberships: {
             study_group_id: @user.study_group_ids_as_teacher,
-          })
+          }).group(:id)
       else
         @scope.none
       end

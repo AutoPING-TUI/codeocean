@@ -177,10 +177,14 @@ CodeOceanEditorSubmissions = {
     event.preventDefault();
     const cause = $('#run');
     this.newSentryTransaction(cause, async () => {
-      this.stopCode(event);
+      await this.stopCode(event);
       if (!cause.is(':visible')) return;
 
-      const submission = await this.createSubmission(cause, null).catch(this.ajaxError.bind(this));
+      const submission = await this.createSubmission(cause, null).catch((response) => {
+        this.ajaxError(response);
+        cause.one('click', this.runCode.bind(this));
+      });
+
       if (!submission) return;
 
       await this.runSubmission(submission);
@@ -192,7 +196,6 @@ CodeOceanEditorSubmissions = {
     this.running = true;
     this.showSpinner($('#run'));
     $('#score_div').addClass('d-none');
-    this.toggleButtonStates();
     await this.socketRunCode(submission.id, CodeOceanEditor.active_file.filename);
   },
 
@@ -202,7 +205,11 @@ CodeOceanEditorSubmissions = {
     this.newSentryTransaction(cause, async () => {
       if (!cause.is(':visible')) return;
 
-      const submission = await this.createSubmission(cause, null).catch(this.ajaxError.bind(this));
+      await this.stopCode(event);
+      const submission = await this.createSubmission(cause, null).catch((response) => {
+        this.ajaxError(response);
+        cause.one('click', this.testCode.bind(this));
+      });
       if (!submission) return;
 
       this.showSpinner($('#test'));

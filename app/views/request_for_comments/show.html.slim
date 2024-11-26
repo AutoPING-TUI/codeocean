@@ -8,10 +8,10 @@
   p.list-group-item-text
     - user = @request_for_comment.user
     - submission = @request_for_comment.submission
-    - testruns = Testrun.where(submission_id: @request_for_comment.submission)
+    - testruns = submission.testruns
     = link_to_if(policy(user).show?, user.displayname, user)
     | | #{@request_for_comment.created_at.localtime}
-    - if @request_for_comment.submission.study_group.present? && policy(@request_for_comment.submission).show_study_group?
+    - if @request_for_comment.submission.study_group.present? && policy(@request_for_comment.submission.study_group).show?
       = ' | '
       = link_to_if(policy(@request_for_comment.submission.study_group).show?, @request_for_comment.submission.study_group, @request_for_comment.submission.study_group)
   .rfc
@@ -42,7 +42,7 @@
             - output_runs.each do |testrun|
               pre = testrun.log || t('request_for_comments.no_output')
 
-        - assess_runs = testruns.select {|run| run.cause == 'assess' }
+        - assess_runs = testruns.select {|run| run.cause == 'assess' }.sort_by {|run| [run.file&.filepath ? 0 : 1, run.file&.filepath] }
         - unless current_user.admin?
           - assess_runs = assess_runs.select {|run| run.file.present? ? !run.file.hidden_feedback? : true }
         - if assess_runs.size.positive?
@@ -50,7 +50,17 @@
           .testrun-assess-results
             - assess_runs.each do |testrun|
               .testrun-container
-                div class="result #{testrun.passed ? 'passed' : 'failed'}"
+                .d-flex.justify-content-between
+                  h6
+                    - if testrun.passed
+                      span.text-success
+                        i.fa-solid.fa-circle-check.me-2 aria-hidden='true'
+                        => "#{t('request_for_comments.passed')}:"
+                    - else
+                      span.text-danger
+                        i.fa-solid.fa-circle-xmark.me-2 aria-hidden='true'
+                        => "#{t('request_for_comments.failed')}:"
+                    = testrun.file.filepath
                 .collapsed.testrun-output.text
                   span.fa-solid.fa-chevron-down.collapse-button
                   pre = testrun.log || t('request_for_comments.no_output')
@@ -71,7 +81,7 @@
   | do not put a carriage return in the line below. it will be present in the presentation of the source code, otherwise.
   | also, all settings from the rails model needed for the editor configuration in the JavaScript are attached to the editor as data attributes here.
 - submission.files.each do |file|
-  = "#{file.path || ''}/#{file.name}#{file.file_type.file_extension}"
+  = file.filepath
   br
   | &nbsp;&nbsp;
   i.fa-solid.fa-arrow-down aria-hidden='true'

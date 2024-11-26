@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
+require 'json_schemer'
+
 class RemoteEvaluationController < ApplicationController
+  REMOTE_EVALUATION_SCHEMA = JSONSchemer.schema(JSON.parse(File.read('lib/code_ocean/remote-evaluation.schema.json')))
+
   include Lti
   include ScoringChecks
   include RemoteEvaluationParameters
@@ -14,14 +18,16 @@ class RemoteEvaluationController < ApplicationController
     result = create_and_score_submission('remoteAssess')
     # For this route, we don't want to display the LTI result, but only the result of the submission.
     try_lti if result.key?(:feedback)
-    render json: result.fetch(:feedback, result), status: result.fetch(:status, 201)
+    location = submission_url(@submission) if @submission
+    render json: result.fetch(:feedback, result), status: result.fetch(:status, 201), location:
   end
 
   # POST /submit
   def submit
     result = create_and_score_submission('remoteSubmit')
     result = try_lti if result.key?(:feedback)
-    render json: result, status: result.fetch(:status, 201)
+    location = submission_url(@submission) if @submission
+    render json: result, status: result.fetch(:status, 201), location:
   end
 
   private
@@ -51,6 +57,8 @@ class RemoteEvaluationController < ApplicationController
   end
 
   def create_and_score_submission(cause)
+    return {message: I18n.t('remote_evaluations.invalid_json'), status: 422} unless valid_submission?
+
     validation_token = remote_evaluation_params[:validation_token]
     if (remote_evaluation_mapping = RemoteEvaluationMapping.find_by(validation_token:))
       @current_user = remote_evaluation_mapping.user
@@ -87,5 +95,12 @@ class RemoteEvaluationController < ApplicationController
     submission_params[:files_attributes] =
       reject_illegal_file_attributes(remote_evaluation_mapping.exercise, files_attributes)
     submission_params
+  end
+
+  def valid_submission?
+    json_params = JSON.parse(request.raw_post)
+    REMOTE_EVALUATION_SCHEMA.valid?(json_params)
+  rescue JSON::ParserError
+    false
   end
 end

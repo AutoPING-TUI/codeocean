@@ -99,9 +99,6 @@ class ExercisesController < ApplicationController
       .user_exercise_feedbacks
       .includes(:exercise, user: [:programming_groups])
       .paginate(page: params[:page], per_page: per_page_param)
-    @submissions = @feedbacks.map do |feedback|
-      feedback.exercise.final_submission(feedback.user.programming_groups.find_by(exercise: @exercise).presence || feedback.user)
-    end
   end
 
   def export_external_check
@@ -424,6 +421,8 @@ class ExercisesController < ApplicationController
     create_and_respond(object: @exercise, params: exercise_params_with_tags) do
       # We first need to create the exercise before handling tips
       handle_exercise_tips tips_params
+      # Don't return a specific value from this block, so that the default is used.
+      nil
     end
   end
 
@@ -494,14 +493,16 @@ class ExercisesController < ApplicationController
 
   def statistics
     # Show general statistic page for specific exercise
-    contributor_statistics = {'InternalUser' => {}, 'ExternalUser' => {}, 'ProgrammingGroup' => {}}
+    contributor_statistics = {InternalUser => {}, ExternalUser => {}, ProgrammingGroup => {}}
 
-    query = policy_scope(Submission).select('contributor_id, contributor_type, MAX(score) AS maximum_score, COUNT(id) AS runs')
+    query = SubmissionPolicy::DeadlineScope.new(current_user, Submission).resolve
+      .select("contributor_id, contributor_type, MAX(score) AS maximum_score, COUNT(id) AS runs, MAX(created_at) FILTER (WHERE cause IN ('submit', 'assess', 'remoteSubmit', 'remoteAssess')) AS created_at, exercise_id")
       .where(exercise_id: @exercise.id)
-      .group('contributor_id, contributor_type')
+      .group('contributor_id, contributor_type, exercise_id')
+      .includes(:contributor, :exercise)
 
     query.each do |tuple|
-      contributor_statistics[tuple['contributor_type']][tuple['contributor_id'].to_i] = tuple
+      contributor_statistics[tuple.contributor_type.constantize][tuple.contributor] = tuple
     end
 
     render locals: {
@@ -512,10 +513,12 @@ class ExercisesController < ApplicationController
   def external_user_statistics
     # Render statistics page for one specific external user
 
+    submissions = SubmissionPolicy::DeadlineScope.new(current_user, Submission).resolve
+      .where(contributor: @external_user, exercise: @exercise)
+      .order(submissions: {created_at: :desc})
+      .includes(:exercise, testruns: [:testrun_messages, {file: [:file_type]}], files: [:file_type])
+
     if policy(@exercise).detailed_statistics?
-      submissions = policy_scope(Submission).where(contributor: @external_user, exercise: @exercise)
-        .order(:created_at)
-        .includes(:exercise, testruns: [:testrun_messages, {file: [:file_type]}], files: [:file_type])
       @show_autosaves = params[:show_autosaves] == 'true' || submissions.where.not(cause: 'autosave').none?
 
       interventions = @external_user.user_exercise_interventions.where(exercise: @exercise)
@@ -548,14 +551,7 @@ class ExercisesController < ApplicationController
         end
       end
     else
-      final_submissions = policy_scope(Submission).where(contributor: @external_user,
-        exercise_id: @exercise.id).final
-      submissions = []
-      %i[before_deadline within_grace_period after_late_deadline].each do |filter|
-        relevant_submission = final_submissions.send(filter).latest
-        submissions.push relevant_submission if relevant_submission.present?
-      end
-      @all_events = submissions
+      @all_events = submissions.sort_by(&:created_at)
     end
 
     render 'exercises/external_users/statistics'
