@@ -461,9 +461,6 @@ var CodeOceanEditor = {
     handleSideBarToggle: function () {
         const sidebar = $('#sidebar');
         sidebar.toggleClass('sidebar-col').toggleClass('sidebar-col-collapsed');
-        if (sidebar.hasClass('w-25') || sidebar.hasClass('restore-to-w-25')) {
-            sidebar.toggleClass('w-25').toggleClass('restore-to-w-25');
-        }
         $('#sidebar-collapsed').toggleClass('d-none');
         $('#sidebar-uncollapsed').toggleClass('d-none');
         if ($('#sidebar-uncollapsed').hasClass('d-none')) {
@@ -565,6 +562,8 @@ var CodeOceanEditor = {
             card.find('i').toggleClass('fa-chevron-down fa-chevron-right')
         });
         card.addClass(this.getCardClass(result));
+        card.addClass(`card border-${this.getCardClass(result)}`);
+        card.find('.card-header').addClass(`bg-${this.getCardClass(result)} text-white`);
         card.find('.card-title .filename').text(result.filename);
         card.find('.card-title .number').text(index + 1);
         card.find('.row .col-md-9').eq(0).find('.number').eq(0).text(result.passed);
