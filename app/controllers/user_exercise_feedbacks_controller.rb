@@ -41,22 +41,20 @@ class UserExerciseFeedbacksController < ApplicationController
       nil
     end
 
-    if @exercise
-      @uef = UserExerciseFeedback.find_or_initialize_by(user: current_user, exercise: @exercise)
-      @uef.update(uef_params)
-      authorize!
-      if validate_inputs(uef_params)
-        path =
-          if rfc && submission && submission.normalized_score.to_d == BigDecimal('1.0')
-            request_for_comment_path(rfc)
-          else
-            implement_exercise_path(@exercise)
-          end
-        create_and_respond(object: @uef, path: proc { path })
-      else
-        flash.now[:danger] = t('shared.message_failure')
-        redirect_back fallback_location: user_exercise_feedback_path(@uef)
-      end
+    @uef = UserExerciseFeedback.find_or_initialize_by(user: current_user, exercise: @exercise)
+    @uef.assign_attributes(uef_params)
+    authorize!
+    if validate_inputs(uef_params)
+      path =
+        if rfc && submission && submission.normalized_score.to_d == BigDecimal('1.0')
+          request_for_comment_path(rfc)
+        else
+          implement_exercise_path(@exercise)
+        end
+      create_and_respond(object: @uef, path: proc { path })
+    else
+      flash.now[:danger] = t('shared.message_failure')
+      redirect_back fallback_location: exercise_user_exercise_feedback_path(@uef)
     end
   end
 
@@ -120,19 +118,15 @@ class UserExerciseFeedbacksController < ApplicationController
                     params[:user_exercise_feedback][:exercise_id]
                   end
 
-    user_id = current_user.id
-    user_type = current_user.class.name
-    latest_submission = Submission
-      .where(user_id:, user_type:, exercise_id:)
-      .order(created_at: :desc).final.first
-    
-    #zu Testzwecken auskommentiert Softwareprojekt
-    #authorize(latest_submission, :show?)
+    exercise = Exercise.find(exercise_id)
+    authorize(exercise, :implement?)
+
+    latest_submission = exercise.final_submission(current_contributor)
+    authorize(latest_submission, :show?)
 
     params[:user_exercise_feedback]
       .permit(:feedback_text, :difficulty, :exercise_id, :user_estimated_worktime_minutes, :user_estimated_worktime_hours, :user_error_feedback, :user_error_feedback_text)
-      .merge(user_id:,
-        user_type:,
+      .merge(user: current_user,
         submission: latest_submission,
         normalized_score: latest_submission&.normalized_score)
   end

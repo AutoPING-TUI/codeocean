@@ -31,5 +31,6 @@ de:
     bad: "weniger hilfreich"
     very_bad: "gar nicht hilfreich"
     user_error_feedback: "Das Fehlerfeedback war:"
+    user_error_feedback_text: "Warum habe ich das Fehlerfeedback so bewertet? (Bitte nur bei negativer Bewertung der vorigen Frage ausfüllen.):"
     minutes: "Minuten"
     hours: "Stunden"
