@@ -43,7 +43,7 @@ class JunitAdapter < TestingFrameworkAdapter
           "<span style=\"color:red\">**Compilation Error**</span> in **file** #{error_file} **line #{line_number}** occured **#{error_name}** at #{code_line_1}\n #{code_line_2}\n #{code_line_3} "
         end
       end || []
-      {count:, failed:, error_messages: error_matches.flatten.compact_blank+compile_error_matches_1line+compile_error_matches_3line}
+      {count:, failed:, error_messages: error_matches.flatten.compact_blank+compile_error_matches_1line+compile_error_matches_3line}.compact_blank
     end
   end
 end

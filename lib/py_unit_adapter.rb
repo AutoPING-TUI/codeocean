@@ -64,6 +64,6 @@ class PyUnitAdapter < TestingFrameworkAdapter
       bad_error_matches = []
     end
     #add bad errors to normal error array
-    {count:, failed: failed + errors, error_messages: assertion_error_matches.flatten.compact_blank+bad_error_matches}
+    {count:, failed: failed + errors, error_messages: assertion_error_matches.flatten.compact_blank+bad_error_matches}.compact_blank
   end
 end
