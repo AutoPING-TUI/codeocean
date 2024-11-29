@@ -1,0 +1,1 @@
+["<span style=\"color:red\">**Compilation Error**</span> in **file** ./org/example/RecursiveMath **line 12** occured **incompatible types: String cannot be converted to int** at power(a,s); "]

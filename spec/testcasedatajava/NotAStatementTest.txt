@@ -1,0 +1,5 @@
+./org/example/RecursiveMath.java:12: error: not a statement
+            "test";
+            ^
+1 error
+make: *** [Makefile:5: test] Error 1

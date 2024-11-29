@@ -1,0 +1,5 @@
+./org/example/RecursiveMath.java:11: error: variable i might not have been initialized
+        i=i+1;
+          ^
+1 error
+make: *** [Makefile:5: test] Error 1

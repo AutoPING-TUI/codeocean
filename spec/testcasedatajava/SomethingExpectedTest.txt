@@ -1,0 +1,5 @@
+./org/example/RecursiveMath.java:12: error: ';' expected
+            return 1/power(base,-exponent)
+                                          ^
+1 error
+make: *** [Makefile:5: test] Error 1

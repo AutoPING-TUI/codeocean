@@ -1,0 +1,5 @@
+./org/example/RecursiveMath.java:12: error: unreachable statement
+            System.out.println("test");
+            ^
+1 error
+make: *** [Makefile:5: test] Error 1

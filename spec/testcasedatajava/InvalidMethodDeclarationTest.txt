@@ -1,0 +1,5 @@
+./org/example/RecursiveMath.java:19: error: invalid method declaration; return type required
+    public static add(int a,int b){
+                  ^
+1 error
+make: *** [Makefile:5: test] Error 1

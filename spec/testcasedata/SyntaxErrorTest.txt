@@ -1,0 +1,25 @@
+Traceback (most recent call last):
+  File "/usr/lib/python3.4/runpy.py", line 170, in _run_module_as_main
+    "__main__", mod_spec)
+  File "/usr/lib/python3.4/runpy.py", line 85, in _run_code
+    exec(code, run_globals)
+  File "/usr/lib/python3.4/unittest/__main__.py", line 18, in <module>
+    main(module=None)
+  File "/usr/lib/python3.4/unittest/main.py", line 92, in __init__
+    self.parseArgs(argv)
+  File "/usr/lib/python3.4/unittest/main.py", line 139, in parseArgs
+    self.createTests()
+  File "/usr/lib/python3.4/unittest/main.py", line 146, in createTests
+    self.module)
+  File "/usr/lib/python3.4/unittest/loader.py", line 157, in loadTestsFromNames
+    suites = [self.loadTestsFromName(name, module) for name in names]
+  File "/usr/lib/python3.4/unittest/loader.py", line 157, in <listcomp>
+    suites = [self.loadTestsFromName(name, module) for name in names]
+  File "/usr/lib/python3.4/unittest/loader.py", line 116, in loadTestsFromName
+    module = __import__('.'.join(parts_copy))
+  File "/workspace/exercise_tests.py", line 1, in <module>
+    from exercise import *
+  File "/workspace/exercise.py", line 1
+    ef even(x):
+          ^
+SyntaxError: invalid syntax

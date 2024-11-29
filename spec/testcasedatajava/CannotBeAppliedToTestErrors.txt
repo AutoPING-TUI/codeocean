@@ -1,0 +1,1 @@
+["<span style=\"color:red\">**Compilation Error**</span> in **file** ./org/example/RecursiveMath **line 12** occured **method power in class RecursiveMath cannot be applied to given types;** at return 1/power();\n required: int,int\r\n found: no arguments\r "]

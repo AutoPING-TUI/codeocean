@@ -1,0 +1,7 @@
+./org/example/RecursiveMath.java:11: error: cannot find symbol
+            System.out.println(i);
+                               ^
+  symbol:   variable i
+  location: class RecursiveMath
+1 error
+make: *** [Makefile:5: test] Error 1

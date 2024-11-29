@@ -1,0 +1,7 @@
+./org/example/RecursiveMath.java:11: error: unexpected type
+        if(1=0){
+           ^
+  required: variable
+  found:    value
+1 error
+make: *** [Makefile:5: test] Error 1

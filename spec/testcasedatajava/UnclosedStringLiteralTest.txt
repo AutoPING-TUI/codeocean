@@ -1,0 +1,5 @@
+./org/example/RecursiveMath.java:6: error: unclosed string literal
+        String s="test;
+                 ^
+1 error
+make: *** [Makefile:5: test] Error 1
