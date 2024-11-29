@@ -35,3 +35,5 @@
 //
 // All remaining assets are loaded in alphabetical order
 //= require_tree .
+//
+//= require showdown

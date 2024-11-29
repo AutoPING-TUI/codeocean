@@ -500,6 +500,9 @@ GEM
       semantic_range (>= 2.3.0)
     shoulda-matchers (6.4.0)
       activesupport (>= 5.2.0)
+    showdown-rails (0.1.0)
+      actionpack (>= 3.1)
+      railties (>= 3.1)
     simplecov (0.22.0)
       docile (~> 1.1)
       simplecov-html (~> 0.11)
@@ -667,6 +670,7 @@ DEPENDENCIES
   sentry-ruby
   shakapacker (= 8.0.2)
   shoulda-matchers
+  showdown-rails
   simplecov
   slim-rails
   slim_lint

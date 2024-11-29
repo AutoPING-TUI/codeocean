@@ -56,6 +56,7 @@ gem 'tubesock', github: 'openhpi/tubesock'
 gem 'turbolinks'
 gem 'whenever', require: false
 gem 'zxcvbn-ruby', require: 'zxcvbn'
+gem 'showdown-rails'
 
 # Error Tracing
 gem 'mnemosyne-ruby'
