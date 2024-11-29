@@ -609,9 +609,10 @@ var CodeOceanEditor = {
             // Just show standard results for normal test results
             } else {
               errorMessagesToShow.forEach(function (item) {
+                  var converter = new showdown.Converter();
+                  var html = converter.makeHtml(item)
                   var li = document.createElement("li");
-                  var text = document.createTextNode(item);
-                  $(li).append(text);
+                  li.innerHTML = html;
                   ul.append(li);
               })
             }
