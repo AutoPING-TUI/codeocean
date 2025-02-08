@@ -56,7 +56,7 @@ gem 'tubesock', github: 'openhpi/tubesock'
 gem 'turbolinks'
 gem 'whenever', require: false
 gem 'zxcvbn-ruby', require: 'zxcvbn'
-gem 'openai'
+gem 'ruby-openai'
 
 
 # Error Tracing

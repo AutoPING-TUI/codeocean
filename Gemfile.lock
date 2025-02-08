@@ -151,6 +151,7 @@ GEM
     erubi (1.13.0)
     et-orbi (1.2.11)
       tzinfo
+    event_stream_parser (1.0.0)
     eventmachine (1.2.7)
     excon (1.2.0)
     execjs (2.10.0)
@@ -163,6 +164,8 @@ GEM
       faraday-net_http (>= 2.0, < 3.4)
       json
       logger
+    faraday-multipart (1.0.4)
+      multipart-post (~> 2)
     faraday-net_http (3.3.0)
       net-http
     faraday-net_http_persistent (2.3.0)
@@ -276,6 +279,7 @@ GEM
     multi_json (1.15.0)
     multi_xml (0.7.1)
       bigdecimal (~> 3.1)
+    multipart-post (2.4.1)
     nested_form (0.3.2)
     net-http (0.5.0)
       uri
@@ -462,6 +466,10 @@ GEM
     rubocop-rspec_rails (2.30.0)
       rubocop (~> 1.61)
       rubocop-rspec (~> 3, >= 3.0.1)
+    ruby-openai (7.3.1)
+      event_stream_parser (>= 0.3.0, < 2.0.0)
+      faraday (>= 1)
+      faraday-multipart (>= 1)
     ruby-progressbar (1.13.0)
     ruby-vips (2.2.2)
       ffi (~> 1.12)
@@ -659,6 +667,7 @@ DEPENDENCIES
   rubocop-rails
   rubocop-rspec
   rubocop-rspec_rails
+  ruby-openai
   rubytree
   rubyzip
   sassc-rails

@@ -1,17 +1,15 @@
 # app/jobs/generate_automatic_comments_job.rb
 class GenerateAutomaticCommentsJob < ApplicationJob
+
   queue_as :default
   def perform(request_for_comment, current_user)
     chat_gpt_user = InternalUser.find_by(email: 'chatgpt@example.org')
     chat_gpt_service = ChatGptService::ChatGptRequest.new
     chat_gpt_disclaimer = I18n.t('exercises.editor.chat_gpt_disclaimer')
     request_for_comment.submission.files.each do |file|
-      response_data = chat_gpt_service.get_response(
-        request_for_comment: request_for_comment,
-        file: file,
-        response_format_needed: true
-      )
-      Rails.logger.debug "Response data: #{response_data.inspect}"
+      prompt = ChatGptHelper.construct_prompt_for_rfc(request_for_comment, file)
+      response = chat_gpt_service.make_chat_gpt_request(prompt, true)
+      response_data = ChatGptHelper.format_response(response)
       next unless response_data.present?
 
       # Create comment for combined 'requirements' comments
@@ -32,7 +30,7 @@ class GenerateAutomaticCommentsJob < ApplicationJob
         create_comment(
           text: "#{line_comment_data[:comment]}\n\n#{chat_gpt_disclaimer}",
           file_id: file.id,
-          row: line_comment_data[:line_number].to_s,
+          row: (line_comment_data[:line_number].positive? ? line_comment_data[:line_number] - 1 : line_comment_data[:line_number]).to_s,
           column: '0',
           user: chat_gpt_user
         )
@@ -55,6 +53,7 @@ class GenerateAutomaticCommentsJob < ApplicationJob
   def send_emails(comment, request_for_comment, current_user, chat_gpt_user)
     send_mail_to_author(comment, request_for_comment, chat_gpt_user)
     send_mail_to_subscribers(comment, request_for_comment, current_user)
+
   end
 
   def send_mail_to_author(comment, request_for_comment, chat_gpt_user)

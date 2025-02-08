@@ -38,20 +38,15 @@ class Testrun < ApplicationRecord
       raise 'Automatic feedback is not enabled for this exercise.'
     end
 
-    # Generate feedback without storing it
-    main_file = submission.main_file
-    exercise_description = submission.exercise.description
-    test_results = output
-    learner_solution = main_file.content
-    test_passed = passed
-
     chatgpt_request = ChatGptService::ChatGptRequest.new
-    feedback_message = chatgpt_request.get_response(
-      learner_solution: learner_solution,
-      exercise: exercise_description,
-      test_results: test_results,
-      test_passed: test_passed
+
+    prompt = ChatGptHelper.format_prompt(
+      learner_solution: submission.main_file.content,
+      exercise: submission.exercise.description,
+      test_results: output,
     )
+
+    feedback_message = chatgpt_request.make_chat_gpt_request(prompt, false)
 
     # Format and sanitize the feedback message
     formatted_feedback = Kramdown::Document.new(feedback_message).to_html
