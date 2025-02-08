@@ -48,6 +48,13 @@ class Testrun < ApplicationRecord
 
     feedback_message = chatgpt_request.make_chat_gpt_request(prompt, false)
 
+    # Store AI feedback history
+    ChatGptHistoryOnScore.create!(
+      testrun_id: self.id,
+      prompt: prompt,
+      response: feedback_message
+    )
+
     # Format and sanitize the feedback message
     formatted_feedback = Kramdown::Document.new(feedback_message).to_html
     sanitized_feedback = ActionController::Base.helpers.sanitize(

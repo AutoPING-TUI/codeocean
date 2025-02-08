@@ -29,6 +29,11 @@ class GenerateAutomaticCommentsJob < ApplicationJob
   def perform_chat_gpt_request(request_for_comment, file, chat_gpt_service)
     prompt = ChatGptHelper.construct_prompt_for_rfc(request_for_comment, file)
     response = chat_gpt_service.make_chat_gpt_request(prompt, true)
+    ChatGptHistoryOnRfc.create!(
+      rfc_id: request_for_comment.id,
+      prompt: prompt,
+      response: response
+    )
     ChatGptHelper.format_response(response)
   end
   
