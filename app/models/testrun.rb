@@ -43,7 +43,7 @@ class Testrun < ApplicationRecord
     prompt = ChatGptHelper.format_prompt(
       learner_solution: submission.main_file.content,
       exercise: submission.exercise.description,
-      test_results: output,
+      test_results: output
     )
 
     feedback_message = chatgpt_request.make_chat_gpt_request(prompt, false)
