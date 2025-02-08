@@ -7,38 +7,55 @@ class GenerateAutomaticCommentsJob < ApplicationJob
     chat_gpt_service = ChatGptService::ChatGptRequest.new
     chat_gpt_disclaimer = I18n.t('exercises.editor.chat_gpt_disclaimer')
     request_for_comment.submission.files.each do |file|
-      prompt = ChatGptHelper.construct_prompt_for_rfc(request_for_comment, file)
-      response = chat_gpt_service.make_chat_gpt_request(prompt, true)
-      response_data = ChatGptHelper.format_response(response)
+      response_data = perform_chat_gpt_request(request_for_comment, file, chat_gpt_service)
       next unless response_data.present?
 
-      # Create comment for combined 'requirements' comments
-      if response_data[:requirements_comments].present?
-        Rails.logger.debug "Requirements comments found."
-        comment = create_comment(
-          text: "#{response_data[:requirements_comments]}\n\n#{chat_gpt_disclaimer}",
-          file_id: file.id,
-          row: '0',
-          column: '0',
-          user: chat_gpt_user
-        )
-        send_emails(comment, request_for_comment, current_user, chat_gpt_user) if comment.persisted?
-      end
+      create_general_comments(
+        response_data,
+        file,
+        chat_gpt_user,
+        chat_gpt_disclaimer,
+        request_for_comment,
+        current_user
+      )
 
       # Create comments for each line-specific comment
-      response_data[:line_specific_comments].each do |line_comment_data|
-        create_comment(
-          text: "#{line_comment_data[:comment]}\n\n#{chat_gpt_disclaimer}",
-          file_id: file.id,
-          row: (line_comment_data[:line_number].positive? ? line_comment_data[:line_number] - 1 : line_comment_data[:line_number]).to_s,
-          column: '0',
-          user: chat_gpt_user
-        )
-      end
+      create_line_specific_comments(response_data, file, chat_gpt_user, chat_gpt_disclaimer)
     end
   end
 
   private
+  
+  def perform_chat_gpt_request(request_for_comment, file, chat_gpt_service)
+    prompt = ChatGptHelper.construct_prompt_for_rfc(request_for_comment, file)
+    response = chat_gpt_service.make_chat_gpt_request(prompt, true)
+    ChatGptHelper.format_response(response)
+  end
+  
+  def create_general_comments(response_data, file, chat_gpt_user, chat_gpt_disclaimer, request_for_comment, current_user)
+    if response_data[:requirements_comments].present?
+      comment = create_comment(
+        text: "#{response_data[:requirements_comments]}\n\n#{chat_gpt_disclaimer}",
+        file_id: file.id,
+        row: '0',
+        column: '0',
+        user: chat_gpt_user
+      )
+    end
+    send_emails(comment, request_for_comment, current_user, chat_gpt_user) if comment.persisted?
+  end
+  
+  def create_line_specific_comments(response_data, file, chat_gpt_user, chat_gpt_disclaimer)
+    response_data[:line_specific_comments].each do |line_comment|
+      comment = create_comment(
+        text: "#{line_comment[:comment]}\n\n#{chat_gpt_disclaimer}",
+        file_id: file.id,
+        row: (line_comment[:line_number].positive? ? line_comment[:line_number] - 1 : line_comment[:line_number]).to_s,
+        column: '0',
+        user: chat_gpt_user
+      )
+    end
+  end
 
   def create_comment(attributes)
     Comment.create(
