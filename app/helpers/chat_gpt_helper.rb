@@ -1,7 +1,7 @@
 
 module ChatGptHelper
 
-  def self. format_prompt(options)
+  def self.format_prompt(options)
     if I18n.locale == :en
       file_path = Rails.root.join('app', 'services/chat_gpt_service/chat_gpt_prompts', 'prompt_en.xml')
       prompt = File.read(file_path)
