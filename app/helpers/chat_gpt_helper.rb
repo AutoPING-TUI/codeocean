@@ -1,19 +1,6 @@
 
 module ChatGptHelper
 
-
-  def self.construct_prompt_for_rfc(request_for_comment, file)
-    submission = request_for_comment.submission
-    test_run_results = Testrun.where(submission_id: submission.id).map(&:log).join("\n")
-    options = {
-      learner_solution: file.content,
-      exercise: submission.exercise.description,
-      test_results: test_run_results,
-      question: request_for_comment.question
-    }
-    format_prompt(options)
-  end
-
   def self. format_prompt(options)
     if I18n.locale == :en
       file_path = Rails.root.join('app', 'services/chat_gpt_service/chat_gpt_prompts', 'prompt_en.xml')
