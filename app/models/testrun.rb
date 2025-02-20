@@ -40,13 +40,14 @@ class Testrun < ApplicationRecord
 
     chatgpt_request = ChatGptService::ChatGptRequest.new
 
+
     prompt = ChatGptHelper.format_prompt(
-      learner_solution: submission.main_file.content,
-      exercise: submission.exercise.description,
+      learner_solution: submission&.files&.select { |file| !file.read_only }.map(&:content).join("\n\n"),
+      exercise: submission&.exercise&.description,
       test_results: output
     )
 
-    feedback_message = chatgpt_request.make_chat_gpt_request(prompt, false)
+    feedback_message = chatgpt_request.execute(prompt, false)
 
     # Store AI feedback history
     ChatGptHistoryOnScore.create!(

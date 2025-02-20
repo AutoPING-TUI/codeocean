@@ -8,7 +8,7 @@ module ChatGptService
       @client = OpenAI::Client.new(access_token: fetch_api_key)
     end
 
-    def make_chat_gpt_request(prompt, response_format_needed = false)
+    def execute(prompt, response_format_needed = false)
       wrap_api_error! do
         data = {
           model: MODEL_NAME,

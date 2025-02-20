@@ -5,35 +5,33 @@ class GenerateAutomaticCommentsJob < ApplicationJob
   def perform(request_for_comment, current_user)
     chat_gpt_user = InternalUser.find_by(email: 'chatgpt@example.org')
     chat_gpt_service = ChatGptService::ChatGptRequest.new
-    chat_gpt_disclaimer = I18n.t('exercises.editor.chat_gpt_disclaimer')
     request_for_comment.submission.files.each do |file|
-      response_data = perform_chat_gpt_request(request_for_comment, file, chat_gpt_service)
+      response_data = perform_request(request_for_comment, file, chat_gpt_service)
       next unless response_data.present?
 
-      create_general_comments(
+      create_general_comment(
         response_data,
         file,
         chat_gpt_user,
-        chat_gpt_disclaimer,
         request_for_comment,
         current_user
       )
 
       # Create comments for each line-specific comment
-      create_line_specific_comments(response_data, file, chat_gpt_user, chat_gpt_disclaimer)
+      create_line_comments(response_data, file, chat_gpt_user)
     end
   end
 
   private
   
-  def perform_chat_gpt_request(request_for_comment, file, chat_gpt_service)
+  def perform_request(request_for_comment, file, chat_gpt_service)
     prompt = ChatGptHelper.format_prompt(
       learner_solution: file.content,
       exercise: request_for_comment.submission.exercise.description,
       test_results: Testrun.where(submission_id: request_for_comment.submission.id).map(&:log).join("\n"),
       question: request_for_comment.question
     )
-    response = chat_gpt_service.make_chat_gpt_request(prompt, true)
+    response = chat_gpt_service.execute(prompt, true)
     ChatGptHistoryOnRfc.create!(
       rfc_id: request_for_comment.id,
       prompt: prompt,
@@ -42,10 +40,10 @@ class GenerateAutomaticCommentsJob < ApplicationJob
     ChatGptHelper.format_response(response)
   end
   
-  def create_general_comments(response_data, file, chat_gpt_user, chat_gpt_disclaimer, request_for_comment, current_user)
+  def create_general_comment(response_data, file, chat_gpt_user, request_for_comment, current_user)
     if response_data[:requirements_comments].present?
       comment = create_comment(
-        text: "#{response_data[:requirements_comments]}\n\n#{chat_gpt_disclaimer}",
+        text: response_data[:requirements_comments],
         file_id: file.id,
         row: '0',
         column: '0',
@@ -55,10 +53,10 @@ class GenerateAutomaticCommentsJob < ApplicationJob
     send_emails(comment, request_for_comment, current_user, chat_gpt_user) if comment.persisted?
   end
   
-  def create_line_specific_comments(response_data, file, chat_gpt_user, chat_gpt_disclaimer)
+  def create_line_comments(response_data, file, chat_gpt_user)
     response_data[:line_specific_comments].each do |line_comment|
-      comment = create_comment(
-        text: "#{line_comment[:comment]}\n\n#{chat_gpt_disclaimer}",
+      create_comment(
+        text: line_comment[:comment],
         file_id: file.id,
         row: (line_comment[:line_number].positive? ? line_comment[:line_number] - 1 : line_comment[:line_number]).to_s,
         column: '0',
@@ -68,8 +66,9 @@ class GenerateAutomaticCommentsJob < ApplicationJob
   end
 
   def create_comment(attributes)
+    chat_gpt_disclaimer = I18n.t('exercises.editor.chat_gpt_disclaimer')
     Comment.create(
-      text: attributes[:text],
+      text: "#{attributes[:text]}\n\n#{chat_gpt_disclaimer}",
       file_id: attributes[:file_id],
       row: attributes[:row],
       column: attributes[:column],
