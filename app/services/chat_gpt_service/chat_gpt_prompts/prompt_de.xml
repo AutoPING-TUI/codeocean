@@ -16,12 +16,12 @@
             Der von dir generierte Hinweis soll, um die Anforderung mit der Nummer 10 zu erfüllen, unbedingt die Fehlermeldung, die der Code hervorgerufen hat, berücksichtigen. Diese Fehlermeldung liegt abgegrenzt in $$$ vor. Wenn keine Fehlermeldung angezeigt wird, bedeutet dies, dass der Testfall bestanden wurde.
         </instruction_4>
 		<instruction_5>
-            Die Anforderungen mit den Nummern 6, 7, 8, 9, 10 und 11 sollen jeweils in einem eigenen Absatz getrennt voneinander im Hinweis erfüllt werden.
+            Die Anforderungen mit den Nummern 6, 7, 8, 9, 10, 11 und 12 sollen jeweils in einem eigenen Absatz getrennt voneinander im Hinweis erfüllt werden. Fügen Sie Anforderung 12 nur dann als Antwort ein, wenn der Schüler eine Frage gestellt hat, die durch ??? getrennt ist.
         </instruction_5>
 		<instruction_6>
             Gehe systematisch vor! Reflektiere deine Vorgehensweise! Gib jedoch nur den Hinweis und nicht deine Vorgehensweise aus!
         </instruction_6>
-		<instruction_7>Der von dir generierte Hinweis soll die Frage beantworten, wenn der Studierende gefragt hat. Die Frage wird durch ??? erfüllt.</instruction_7>
+		<instruction_7>Wenn Sie dem Studentencode einen zeilenspezifischen Kommentar hinzufügen, müssen alle Anforderungen von 1 bis 12 erfüllt sein.</instruction_7>>
 	</instructions>
 	<requirements>
 		<delimiter>###</delimiter>
@@ -36,6 +36,9 @@
 		<requirement_KC-EXA-feedback>9. Der Hinweis muss konzeptuelles Wissen, welches für die Bearbeitung der Aufgabe benötigt wird, enthalten – in Form von Beispielen, welche grundlegende Konzepte der Aufgabe verdeutlichen. Dieser Bestandteil soll in deinem Hinweis mit “(4)” gekennzeichnet sein. Beziehe dich auf das von dir ausgewählte Konzept in der Antwort auf die Anforderung Nummer 8. Finde hierfür ein eigenes, konkretes Beispiel, welches das grundlegende Konzept implementiert und sich nicht auf die vorliegende Programmieraufgabe bezieht! Zeige unbedingt einen Code-Schnipsel, um dein Beispiel zu untermauern!</requirement_KC-EXA-feedback>
 		<requirement_KM-feedback>10. Der Hinweis muss Compiler-Fehler bzw. Interpreter-Fehler beschreiben. Compiler-Fehler bzw. Interpreter-Fehler sind syntaktische Fehler (falsche Schreibweise, fehlende Klammern). Dieser Bestandteil soll in deinem Hinweis mit “(5)” gekennzeichnet sein. Es soll eine ausführliche Erklärung des Fehlers an sich gegeben werden. Hierin sollen keine Schritte zur Lösung des Fehlers ausgegeben werden.</requirement_KM-feedback>
 		<requirement_KH-EC-feedback>11. Der Hinweis muss Wissen über das weitere Vorgehen des Lernenden enthalten. Beziehe dich auf die Behebung der Art des vorliegenden Fehlers! Dieser Bestandteil soll in deinem Hinweis mit “(6)” gekennzeichnet sein. Erkläre allgemein den methodischen Schritt zur Behebung des Fehlers. Zeige hierzu unter keinen Umständen die exakte Vorgehensweise zum Lösen des Fehlers – z. B. „Ändere dies in der Zeile X“! Zeige stattdessen, welche generellen Schritte der Lernende als Nächstes unternehmen kann. Z. B. kann der Hinweis lauten: „Als Nächstes recherchiere dieses Thema im Internet.“, „Informiere dich über diese Thematik“, „Passe deinen Code in dieser Hinsicht an.“ oder „Teste die Ausgabe deines Codes.“</requirement_KH-EC-feedback>
+		<requirement_answer>
+			12. Der Hinweis muss die vom Schüler gestellte Frage beantworten. Dieser Teil sollte in Ihrem Hinweis mit “(7)” gekennzeichnet werden. Geben Sie eine klare und prägnante Antwort auf die Frage des Schülers. Geben Sie keine zusätzlichen Informationen an, die nicht in direktem Zusammenhang mit der gestellten Frage oder der Übung stehen.
+		</requirement_answer>
 	</requirements>
 	<input>
 		<code name="Code des Lernenden" type="string">

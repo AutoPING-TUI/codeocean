@@ -7,10 +7,9 @@
         <instruction_2>The hint you generate must meet each requirement delimited by ###.</instruction_2>
         <instruction_3>The hint you generate should, to fulfill requirements 7, 8, and 9, take into account the task of the programming assignment, which is delimited by %%%.</instruction_3>
         <instruction_4>The hint you generate should, to fulfill requirement 10, definitely take into account the error message that the code caused. This error message is delimited by $$$. If there is no error message that means the test case has passed.</instruction_4>
-        <instruction_5>Requirements 6, 7, 8, 9, 10, 11 should each be met in their own separate paragraph in the hint.</instruction_5>
+        <instruction_5>Requirements 6, 7, 8, 9, 10, 11, 12 should each be met in their own separate paragraph in the hint. only include requirement 12 in response if there is a question asked by the student delimited by ???.</instruction_5>
         <instruction_6>Proceed systematically! Reflect on your approach! However, only output the hint, not your approach!</instruction_6>
-        <instruction_7>The hint must answer the question if asked by the student. The question is delimited by ???.</instruction_7>
-        <instruction_8>If you are providing a line specific comment to student's code, then all the requirements from 1 to 11 should be met.</instruction_8>
+        <instruction_7>If you are providing a line specific comment to student's code, then all the requirements from 1 to 12 should be met.</instruction_7>
     </instructions>
     <requirements>
         <delimiter>###</delimiter>
@@ -37,6 +36,9 @@
         <requirement_KH-EC-feedback>
             11. The hint must contain knowledge about the learner's next steps for resolving this type of error. Relate this to fixing the kind of error present! This part should be marked with "(6)" in your hint. Explain the general steps the learner can take next, without showing the exact solution to the error, such as “Change this in line X”! Instead, provide general steps like: “Research this topic online,” “Learn more about this,” “Adjust your code accordingly,” or “Test the output of your code.”
         </requirement_KH-EC-feedback>
+        <requirement_answer>
+            12. The hint must answer the question asked by the student. This part should be marked with "(7)" in your hint. Provide a clear and concise answer to the student's question. Do not provide additional information that is not directly related to the question asked or the exercise.
+        </requirement_answer>
     </requirements>
     <input>
         <code name="Learner's Code" type="string">

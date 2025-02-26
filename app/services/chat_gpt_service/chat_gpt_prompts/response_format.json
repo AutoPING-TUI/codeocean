@@ -14,7 +14,7 @@
             "properties": {
               "requirement_number": {
                 "type": "integer",
-                "description": "The requirement number (6 to 11) from the input prompt."
+                "description": "The requirement number (6 to 12) from the input prompt."
               },
               "comment": {
                 "type": "string",
