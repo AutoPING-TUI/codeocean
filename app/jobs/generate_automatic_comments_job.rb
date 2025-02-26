@@ -23,10 +23,14 @@ class GenerateAutomaticCommentsJob < ApplicationJob
   end
 
   private
-  
+
+  def add_line_numbers(code)
+    code.split("\n").each_with_index.map { |line, index| "#{index + 1}: #{line}" }.join("\n")
+  end
+
   def perform_request(request_for_comment, file, chat_gpt_service)
     prompt = ChatGptHelper.format_prompt(
-      learner_solution: file.content,
+      learner_solution: add_line_numbers(file.content),
       exercise: request_for_comment.submission.exercise.description,
       test_results: Testrun.where(submission_id: request_for_comment.submission.id).map(&:log).join("\n"),
       question: request_for_comment.question
