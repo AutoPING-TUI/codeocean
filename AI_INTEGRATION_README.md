@@ -12,7 +12,7 @@ This project integrates ChatGPT into CodeOcean to provide automated feedback for
 
 - **AI API:** OpenAI Chat Completions
 - **Jobs:** Asynchronous processing via Solid Queue
-- **Frontend:** Adds "Request Feedback from AI" buttons for students
+- **Frontend:** Adds "Request Feedback from AI" buttons for test results on Score
 
 ## Key Components
 
