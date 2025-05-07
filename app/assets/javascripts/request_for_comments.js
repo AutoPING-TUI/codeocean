@@ -66,11 +66,12 @@ $(document).on('turbolinks:load', function () {
         // set editor mode (used for syntax highlighting
         currentEditor.getSession().setMode($(editor).data('mode'));
         currentEditor.setTheme(CodeOceanEditor.THEME);
-
         currentEditor.commentVisualsByLine = {};
         setAnnotations(currentEditor, $(editor).data('file-id'));
         currentEditor.on("guttermousedown", handleSidebarClick);
         currentEditor.on("guttermousemove", showPopover);
+        currentEditor.getSession().setOption("useWorker", false);
+
     });
 
     const handleAceThemeChangeEvent = function() {

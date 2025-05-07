@@ -57,6 +57,8 @@ gem 'turbolinks'
 gem 'webauthn'
 gem 'whenever', require: false
 gem 'zxcvbn-ruby', require: 'zxcvbn'
+gem 'ruby-openai'
+
 
 # Error Tracing
 gem 'mnemosyne-ruby'

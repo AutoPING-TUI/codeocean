@@ -31,4 +31,43 @@ class Testrun < ApplicationRecord
       testrun_messages.output.pluck(:log).join.presence
     end
   end
+
+  def generate_ai_feedback
+    # Validate if the exercise allows automatic feedback
+    unless submission.exercise.allow_ai_feedback_on_score
+      raise 'Automatic feedback is not enabled for this exercise.'
+    end
+
+    chatgpt_request = ChatGptService::ChatGptRequest.new
+
+
+    prompt = ChatGptHelper.format_prompt(
+      learner_solution: submission&.files&.select { |file| !file.read_only }.map(&:content).join("\n\n"),
+      exercise: submission&.exercise&.description,
+      test_results: output
+    )
+
+    feedback_message = chatgpt_request.execute(prompt, false)
+
+    # Store AI feedback history
+    ChatGptHistoryOnScore.create!(
+      testrun_id: self.id,
+      prompt: prompt,
+      response: feedback_message
+    )
+
+    # Format and sanitize the feedback message
+    formatted_feedback = Kramdown::Document.new(feedback_message).to_html
+    sanitized_feedback = ActionController::Base.helpers.sanitize(
+      formatted_feedback,
+      tags: %w(p br strong em a code pre h1 h2 h3 ul ol li blockquote),
+      attributes: %w(href)
+    )
+
+    sanitized_feedback.html_safe
+  rescue => e
+    # Return the error message to be handled by the caller
+    e.message
+  end
+
 end
